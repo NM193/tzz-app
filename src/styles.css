@@ -1,0 +1,664 @@
+:root {
+  --bg: #14161a;
+  --panel: #1c1f25;
+  --panel-raised: #22262d;
+  --line: #2b303a;
+  --text: #e6e8ec;
+  --muted: #868e9b;
+  --signal: #f0a93b;
+  --signal-dim: #5a4423;
+  --ok: #5fd38d;
+  --alert: #e8705f;
+
+  --radius: 5px;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.masthead h1 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* --- Deck: the input + meter block --------------------------------------- */
+
+.deck,
+.panel,
+.result {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.deck {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.input-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+input[type="url"],
+textarea#url {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+input[type="url"]::placeholder,
+textarea#url::placeholder {
+  color: #5a616d;
+}
+
+input[type="url"]:focus-visible,
+textarea#url:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+input[type="url"]:disabled,
+textarea#url:disabled {
+  opacity: 0.55;
+}
+
+.primary-button {
+  padding: 10px 18px;
+  background: var(--signal);
+  border: none;
+  border-radius: var(--radius);
+  color: #1a1206;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  background: var(--signal-dim);
+  color: #97897a;
+  cursor: not-allowed;
+}
+
+.ghost-button {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.ghost-button:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+/* --- Signature element: segmented level meter ---------------------------- */
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.meter__segments {
+  display: flex;
+  gap: 3px;
+  height: 18px;
+}
+
+.segment {
+  flex: 1;
+  background: #23272f;
+  border-radius: 1px;
+  transition: background-color 120ms linear;
+}
+
+.segment--lit {
+  background: var(--signal);
+}
+
+.segment--done.segment--lit {
+  background: var(--ok);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segment {
+    transition: none;
+  }
+}
+
+.meter__readout {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.readout-stage {
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.readout-value {
+  color: var(--signal);
+  white-space: pre;
+}
+
+.detail {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* --- Options panel ------------------------------------------------------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel__row--tap {
+  cursor: pointer;
+}
+
+.panel__row--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.chip--first {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+.chip em {
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.path {
+  margin: 4px 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.path--link {
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  color: var(--signal);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* --- Messages ------------------------------------------------------------ */
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--panel-raised);
+  border-left: 2px solid var(--muted);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.notice code {
+  font-family: var(--mono);
+  color: var(--text);
+}
+
+.notice--blocking {
+  border-left-color: var(--signal);
+}
+
+.notice--error {
+  border-left-color: var(--alert);
+  color: #f0b5ac;
+  white-space: pre-wrap;
+}
+
+/* --- Result -------------------------------------------------------------- */
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.transcript__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.button-group {
+  display: flex;
+  gap: 6px;
+}
+
+.transcript__body {
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 6px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #cdd2da;
+}
+
+/* --- Dropzone: local files bypass YouTube entirely ----------------------- */
+
+.dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.dropzone--active {
+  border-color: var(--signal);
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+/* --- Queue: one row per job ---------------------------------------------- */
+
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.queue__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.queue__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line);
+  flex: none;
+}
+
+.queue__row--running .queue__dot { background: var(--signal); }
+.queue__row--done .queue__dot { background: var(--ok); }
+.queue__row--failed .queue__dot { background: var(--alert); }
+
+.queue__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.queue__label {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue__error {
+  color: var(--alert);
+  font-size: 11px;
+  white-space: normal;
+}
+
+/* --- Link field: pasted links become pills ------------------------------- */
+
+.link-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  min-height: 42px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: text;
+}
+
+.link-field:focus-within {
+  border-color: var(--signal);
+}
+
+.link-field--disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 4px 3px 10px;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pill--loading {
+  color: var(--muted);
+  border-color: var(--signal-dim);
+}
+
+.pill--failed {
+  color: var(--alert);
+  border-color: var(--alert);
+}
+
+.pill__remove {
+  flex: none;
+  padding: 0 4px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pill__remove:hover {
+  color: var(--text);
+}
+
+.link-field__input {
+  flex: 1;
+  min-width: 120px;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.link-field__input:focus {
+  outline: none;
+}
+
+.link-field__input::placeholder {
+  color: #5a616d;
+}
+
+/* --- Recorder: always on screen, independent of the queue ---------------- */
+
+.recorder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.recorder--live {
+  border-color: var(--alert);
+}
+
+.recorder__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line);
+  flex: none;
+}
+
+.recorder--live .recorder__dot {
+  background: var(--alert);
+}
+
+.recorder__time {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  min-width: 46px;
+}
+
+.recorder__input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.recorder__input--empty {
+  border-style: dashed;
+  padding: 6px 8px;
+}
+
+
+/* --- Input level: proof the app is actually hearing something ------------ */
+
+.level {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+  flex: none;
+}
+
+.level__bar {
+  width: 3px;
+  height: 100%;
+  background: var(--line);
+  border-radius: 1px;
+  transition: background 60ms linear;
+}
+
+.level__bar--lit {
+  background: var(--ok);
+}
+
+.level__bar--hot.level__bar--lit {
+  background: var(--alert);
+}
+
+.recorder__routed {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* --- Options as a modal: settings are a detour, not part of the page ----- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 20px;
+  background: rgba(10, 11, 13, 0.65);
+  overflow-y: auto;
+}
+
+.panel--modal {
+  width: 100%;
+  max-width: 520px;
+  margin: 0;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hint,
+.field-label .hint {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  max-width: 34ch;
+}
