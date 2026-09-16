@@ -53,6 +53,7 @@ const STORAGE_KEY = "yt-mp3.settings.v1";
 
 type Settings = {
   outDir: string;
+  wantAudio: boolean;
   wantTranscript: boolean;
   transcriptLangs: string[];
   audioQuality: AudioQuality;
@@ -66,6 +67,7 @@ type Settings = {
 
 const DEFAULT_SETTINGS: Settings = {
   outDir: "",
+  wantAudio: true,
   wantTranscript: true,
   transcriptLangs: ["sr", "en"],
   audioQuality: "v0",
@@ -195,6 +197,7 @@ export default function App() {
     return runJob({
       url: item.target,
       outDir: settings.outDir || null,
+      wantAudio: settings.wantAudio,
       wantTranscript: settings.wantTranscript,
       transcriptLangs: settings.transcriptLangs,
       audioQuality: settings.audioQuality,
@@ -576,199 +579,221 @@ export default function App() {
                   type="button"
                   className={pendingStart ? "primary-button" : "ghost-button"}
                   onClick={pendingStart ? confirmStart : cancelSettings}
+                  disabled={
+                    !!pendingStart &&
+                    !settings.wantAudio &&
+                    !settings.keepVideo &&
+                    !settings.wantTranscript
+                  }
                 >
                   {pendingStart ? "Start" : "Done"}
                 </button>
               </div>
             </header>
-          <div className="panel__row">
-            <div>
-              <span className="field-label">Save to</span>
-              <p className="path">
-                {settings.outDir || "~/Documents/Tzz Library"}
-              </p>
-              <span className="hint">Each video gets its own folder in here.</span>
-            </div>
-            <div className="button-group">
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() =>
-                  openOutputFolder(settings.outDir || null).catch((caught) =>
-                    setError(errorMessage(caught)),
-                  )
+
+            {/* ---- What comes out. Read top to bottom, this is the job. ---- */}
+            <span className="field-label panel__section">What to keep</span>
+
+            <label className="panel__row panel__row--tap">
+              <span className="field-label">Audio (MP3)</span>
+              <input
+                type="checkbox"
+                checked={settings.wantAudio}
+                onChange={(event) =>
+                  setSettings((prev) => ({ ...prev, wantAudio: event.target.checked }))
                 }
-              >
-                Open
-              </button>
-              <button type="button" className="ghost-button" onClick={pickFolder}>
-                Change
-              </button>
-            </div>
-          </div>
+              />
+            </label>
+            {settings.wantAudio && (
+              <div className="panel__row panel__row--stacked panel__row--indent">
+                <div className="chips">
+                  {(
+                    [
+                      ["v0", "VBR V0"],
+                      ["320", "CBR 320"],
+                    ] as [AudioQuality, string][]
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`chip ${settings.audioQuality === value ? "chip--first" : ""}`}
+                      onClick={() =>
+                        setSettings((prev) => ({ ...prev, audioQuality: value }))
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-          <label className="panel__row panel__row--tap">
-            <span className="field-label">Also get the transcript</span>
-            <input
-              type="checkbox"
-              checked={settings.wantTranscript}
-              onChange={(event) =>
-                setSettings((prev) => ({
-                  ...prev,
-                  wantTranscript: event.target.checked,
-                }))
-              }
-            />
-          </label>
-
-          <div className="panel__row panel__row--stacked">
-            <span className="field-label">MP3 quality</span>
-            <div className="chips">
-              {(
-                [
-                  ["v0", "VBR V0"],
-                  ["320", "CBR 320"],
-                ] as [AudioQuality, string][]
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={`chip ${settings.audioQuality === value ? "chip--first" : ""}`}
-                  onClick={() =>
-                    setSettings((prev) => ({ ...prev, audioQuality: value }))
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="panel__row panel__row--tap">
-            <span className="field-label">
-              Check the options before each job
-              <em className="hint">
-                Opens this panel when work is added, so a setting is not
-                remembered an hour too late.
-              </em>
-            </span>
-            <input
-              type="checkbox"
-              checked={settings.reviewBeforeStart}
-              onChange={(event) =>
-                setSettings((prev) => ({ ...prev, reviewBeforeStart: event.target.checked }))
-              }
-            />
-          </label>
-
-          <label className="panel__row panel__row--tap">
-            <span className="field-label">
-              Read what is on screen
-              <em className="hint">
-                Adds slide and panel text to the transcript. Downloads the video
-                and takes a few minutes more.
-              </em>
-            </span>
-            <input
-              type="checkbox"
-              checked={settings.readScreen}
-              onChange={(event) =>
-                setSettings((prev) => ({ ...prev, readScreen: event.target.checked }))
-              }
-            />
-          </label>
-
-          <label className="panel__row panel__row--tap">
-            <span className="field-label">
-              Keep the video
-              <em className="hint">Otherwise only the MP3 is saved.</em>
-            </span>
-            <input
-              type="checkbox"
-              checked={settings.keepVideo}
-              onChange={(event) =>
-                setSettings((prev) => ({ ...prev, keepVideo: event.target.checked }))
-              }
-            />
-          </label>
-
-          <label className="panel__row panel__row--tap">
-            <span className="field-label">Combine a queue into one file</span>
-            <input
-              type="checkbox"
-              checked={settings.combineQueue}
-              onChange={(event) =>
-                setSettings((prev) => ({ ...prev, combineQueue: event.target.checked }))
-              }
-            />
-          </label>
-
-          <div className="panel__row panel__row--stacked">
-            <span className="field-label">Transcript file</span>
-            <div className="chips">
-              {(
-                [
-                  ["md", "Markdown"],
-                  ["pdf", "PDF"],
-                  ["both", "Both"],
-                ] as [TranscriptFormat, string][]
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={`chip ${settings.transcriptFormat === value ? "chip--first" : ""}`}
-                  onClick={() =>
-                    setSettings((prev) => ({ ...prev, transcriptFormat: value }))
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel__row panel__row--stacked">
-            <span className="field-label">Transcript language order</span>
-            <div className="chips">
-              {["sr", "en"].map((lang) => {
-                const position = settings.transcriptLangs.indexOf(lang);
-                return (
-                  <button
-                    key={lang}
-                    type="button"
-                    className={`chip ${position === 0 ? "chip--first" : ""}`}
-                    onClick={() =>
-                      setSettings((prev) =>
-                        prev.transcriptLangs[0] === lang
-                          ? prev
-                          : {
-                              ...prev,
-                              transcriptLangs: [...prev.transcriptLangs].reverse(),
-                            },
-                      )
-                    }
-                  >
-                    {lang.toUpperCase()}
-                    {position === 0 && <em>first</em>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="panel__row">
-            <div>
+            <label className="panel__row panel__row--tap">
               <span className="field-label">
-                Whisper model {whisperReady ? "" : "(whisper-cli not installed)"}
+                Video file
+                <em className="hint">Best quality. About a gigabyte an hour.</em>
               </span>
-              <p className="path">
-                {settings.whisperModelPath || "Not set -- captions only"}
-              </p>
+              <input
+                type="checkbox"
+                checked={settings.keepVideo}
+                onChange={(event) =>
+                  setSettings((prev) => ({ ...prev, keepVideo: event.target.checked }))
+                }
+              />
+            </label>
+
+            <label className="panel__row panel__row--tap">
+              <span className="field-label">Transcript</span>
+              <input
+                type="checkbox"
+                checked={settings.wantTranscript}
+                onChange={(event) =>
+                  setSettings((prev) => ({ ...prev, wantTranscript: event.target.checked }))
+                }
+              />
+            </label>
+            {settings.wantTranscript && (
+              <>
+                <div className="panel__row panel__row--stacked panel__row--indent">
+                  <div className="chips">
+                    {(
+                      [
+                        ["md", "Markdown"],
+                        ["pdf", "PDF"],
+                        ["both", "Both"],
+                      ] as [TranscriptFormat, string][]
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`chip ${settings.transcriptFormat === value ? "chip--first" : ""}`}
+                        onClick={() =>
+                          setSettings((prev) => ({ ...prev, transcriptFormat: value }))
+                        }
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="panel__row panel__row--tap panel__row--indent">
+                  <span className="field-label">
+                    Read what is on screen
+                    <em className="hint">
+                      Adds slide and panel text. Fetches the video and takes a
+                      few minutes more.
+                    </em>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.readScreen}
+                    onChange={(event) =>
+                      setSettings((prev) => ({ ...prev, readScreen: event.target.checked }))
+                    }
+                  />
+                </label>
+
+                <div className="panel__row panel__row--stacked panel__row--indent">
+                  <span className="field-label">Language order</span>
+                  <div className="chips">
+                    {["sr", "en"].map((lang) => {
+                      const position = settings.transcriptLangs.indexOf(lang);
+                      return (
+                        <button
+                          key={lang}
+                          type="button"
+                          className={`chip ${position === 0 ? "chip--first" : ""}`}
+                          onClick={() =>
+                            setSettings((prev) =>
+                              prev.transcriptLangs[0] === lang
+                                ? prev
+                                : {
+                                    ...prev,
+                                    transcriptLangs: [...prev.transcriptLangs].reverse(),
+                                  },
+                            )
+                          }
+                        >
+                          {lang.toUpperCase()}
+                          {position === 0 && <em>first</em>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {(!pendingStart || pendingStart.length > 1) && (
+              <label className="panel__row panel__row--tap">
+                <span className="field-label">Combine a queue into one file</span>
+                <input
+                  type="checkbox"
+                  checked={settings.combineQueue}
+                  onChange={(event) =>
+                    setSettings((prev) => ({ ...prev, combineQueue: event.target.checked }))
+                  }
+                />
+              </label>
+            )}
+
+            {/* ---- Where and how. Rarely changed. ---- */}
+            <span className="field-label panel__section">Setup</span>
+
+            <div className="panel__row">
+              <div>
+                <span className="field-label">Save to</span>
+                <p className="path">
+                  {settings.outDir || "~/Documents/Tzz Library"}
+                </p>
+                <span className="hint">Each video gets its own folder in here.</span>
+              </div>
+              <div className="button-group">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() =>
+                    openOutputFolder(settings.outDir || null).catch((caught) =>
+                      setError(errorMessage(caught)),
+                    )
+                  }
+                >
+                  Open
+                </button>
+                <button type="button" className="ghost-button" onClick={pickFolder}>
+                  Change
+                </button>
+              </div>
             </div>
-            <button type="button" className="ghost-button" onClick={pickModel}>
-              Choose
-            </button>
-          </div>
+
+            <div className="panel__row">
+              <div>
+                <span className="field-label">
+                  Whisper model {whisperReady ? "" : "(whisper-cli not installed)"}
+                </span>
+                <p className="path">
+                  {settings.whisperModelPath || "Not set -- captions only"}
+                </p>
+              </div>
+              <button type="button" className="ghost-button" onClick={pickModel}>
+                Choose
+              </button>
+            </div>
+
+            <label className="panel__row panel__row--tap">
+              <span className="field-label">
+                Ask before each job
+                <em className="hint">Opens this panel when work is added.</em>
+              </span>
+              <input
+                type="checkbox"
+                checked={settings.reviewBeforeStart}
+                onChange={(event) =>
+                  setSettings((prev) => ({ ...prev, reviewBeforeStart: event.target.checked }))
+                }
+              />
+            </label>
           </section>
         </div>
       )}
@@ -778,13 +803,34 @@ export default function App() {
       {result && (
         <section className="result">
           <h2>{result.title}</h2>
-          <button
-            type="button"
-            className="path path--link"
-            onClick={() => revealInFileManager(result.audioPath)}
-          >
-            {result.audioPath}
-          </button>
+          <div className="result__files">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => revealInFileManager(result.folder)}
+            >
+              Go to folder
+            </button>
+            {result.audioPath && (
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => revealInFileManager(result.audioPath!)}
+              >
+                MP3
+              </button>
+            )}
+            {result.videoPath && (
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => revealInFileManager(result.videoPath!)}
+              >
+                Video
+              </button>
+            )}
+          </div>
+          <p className="path">{result.folder}</p>
 
           {result.warnings.map((warning) => (
             <p key={warning} className="notice">

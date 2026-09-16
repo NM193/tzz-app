@@ -662,3 +662,24 @@ textarea#url:disabled {
   color: var(--muted);
   max-width: 34ch;
 }
+
+/* --- Options panel: outputs first, plumbing second --------------------- */
+
+.panel__section {
+  display: block;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--signal);
+}
+
+.panel__row--indent {
+  padding-left: 18px;
+}
+
+.result__files {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}

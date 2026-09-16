@@ -39,7 +39,12 @@ export type Transcript = {
 
 export type JobResult = {
   title: string;
-  audioPath: string;
+  /** Where everything for this job was written. Always present. */
+  folder: string;
+  /** null when only the video was asked for. */
+  audioPath: string | null;
+  /** Present when the video was kept. */
+  videoPath: string | null;
   transcript: Transcript | null;
   warnings: string[];
 };
@@ -47,6 +52,8 @@ export type JobResult = {
 export type JobRequest = {
   url: string;
   outDir: string | null;
+  /** Keep the MP3. Audio may still be fetched for a transcript and discarded. */
+  wantAudio: boolean;
   wantTranscript: boolean;
   transcriptLangs: string[];
   audioQuality: AudioQuality;

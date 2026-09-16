@@ -28,8 +28,11 @@ fn supported_extension(path: &std::path::Path) -> bool {
 #[serde(rename_all = "camelCase")]
 pub struct JobRequest {
     pub url: String,
-    /// Absolute folder path. Defaults to ~/Downloads when empty.
+    /// Absolute folder path. Defaults to the library when empty.
     pub out_dir: Option<String>,
+    /// Keep the MP3. Defaults to true; the audio may still be fetched for a
+    /// transcript and thrown away afterwards.
+    pub want_audio: Option<bool>,
     pub want_transcript: bool,
     /// Ordered language preference for captions, e.g. ["sr", "en"].
     pub transcript_langs: Vec<String>,
@@ -63,7 +66,13 @@ pub struct LocalFileRequest {
 #[serde(rename_all = "camelCase")]
 pub struct JobResult {
     pub title: String,
-    pub audio_path: String,
+    /// Where everything for this job was written. Always present, so there is
+    /// always somewhere to open even when nothing else is.
+    pub folder: String,
+    /// Absent when the user asked for the video alone.
+    pub audio_path: Option<String>,
+    /// Present when the video was kept.
+    pub video_path: Option<String>,
     pub transcript: Option<Transcript>,
     /// Non-fatal problems, e.g. audio saved but transcript unavailable.
     pub warnings: Vec<String>,
@@ -125,55 +134,85 @@ pub async fn run_job(app: AppHandle, request: JobRequest) -> Result<JobResult, S
     let out_dir = resolve_out_dir(request.out_dir.as_deref())?;
     let mut warnings: Vec<String> = Vec::new();
 
+    let want_audio = request.want_audio.unwrap_or(true);
+    let want_video = request.keep_video.unwrap_or(false);
+    let read_screen = request.read_screen.unwrap_or(false);
+
+    if !want_audio && !want_video && !request.want_transcript {
+        return Err("Choose at least one thing to keep: audio, video, or a transcript.".to_string());
+    }
+
     ytdlp::emit(&app, ProgressEvent::stage("probing", Some("Reading video info".into())));
     let meta = ytdlp::probe(&url).await?;
 
     let job_dir = job_folder(&out_dir, &meta.title, &meta.id)?;
 
-    ytdlp::emit(&app, ProgressEvent::stage("downloading", Some(meta.title.clone())));
-    let output = ytdlp::download_audio(
-        &app,
-        DownloadOptions {
-            url: &url,
-            out_dir: &job_dir,
-            video_id: &meta.id,
-            want_subtitles: request.want_transcript,
-            subtitle_langs: &request.transcript_langs,
-            audio_quality: audio_quality_flag(request.audio_quality.as_deref()),
-        },
-    )
-    .await?;
+    // The audio call is also what fetches the captions, and Whisper needs the
+    // file, so a transcript pulls the audio in even when the MP3 is unwanted.
+    // It is deleted at the end in that case rather than never fetched.
+    let output = if want_audio || request.want_transcript {
+        ytdlp::emit(&app, ProgressEvent::stage("downloading", Some(meta.title.clone())));
+        Some(
+            ytdlp::download_audio(
+                &app,
+                DownloadOptions {
+                    url: &url,
+                    out_dir: &job_dir,
+                    video_id: &meta.id,
+                    want_subtitles: request.want_transcript,
+                    subtitle_langs: &request.transcript_langs,
+                    audio_quality: audio_quality_flag(request.audio_quality.as_deref()),
+                },
+            )
+            .await?,
+        )
+    } else {
+        None
+    };
 
-    warnings.extend(output.warnings.iter().cloned());
+    if let Some(output) = &output {
+        warnings.extend(output.warnings.iter().cloned());
+    }
 
     // The video is fetched when the screen is to be read, or simply when the
     // user wants to keep it. Reading is the slow part, so it stays opt-in.
-    let screens = if request.read_screen.unwrap_or(false) || request.keep_video.unwrap_or(false) {
+    let (screens, video_path) = if read_screen || want_video {
         screens_from_youtube(&app, &url, &meta.id, &request, &job_dir, &mut warnings).await
     } else {
-        Vec::new()
+        (Vec::new(), None)
     };
 
     let mut result_transcript: Option<Transcript> = None;
 
-    if request.want_transcript {
-        match build_transcript(&app, &output, &request, &meta, &url, &screens, &mut warnings).await {
+    if let (true, Some(output)) = (request.want_transcript, &output) {
+        match build_transcript(&app, output, &request, &meta, &url, &screens, &mut warnings).await {
             Ok(Some(text)) => result_transcript = Some(text),
             Ok(None) => {}
             Err(message) => warnings.push(message),
         }
     }
 
-    // Clean up the raw .srt files once their text has been extracted.
-    for path in &output.subtitle_paths {
-        let _ = std::fs::remove_file(path);
+    let mut audio_path = None;
+    if let Some(output) = &output {
+        // Clean up the raw .srt files once their text has been extracted.
+        for path in &output.subtitle_paths {
+            let _ = std::fs::remove_file(path);
+        }
+
+        if want_audio {
+            audio_path = Some(output.audio_path.to_string_lossy().into_owned());
+        } else {
+            let _ = std::fs::remove_file(&output.audio_path);
+        }
     }
 
     ytdlp::emit(&app, ProgressEvent::stage("done", None));
 
     Ok(JobResult {
         title: meta.title,
-        audio_path: output.audio_path.to_string_lossy().into_owned(),
+        folder: job_dir.to_string_lossy().into_owned(),
+        audio_path,
+        video_path: video_path.map(|p| p.to_string_lossy().into_owned()),
         transcript: result_transcript,
         warnings,
     })
@@ -330,7 +369,12 @@ pub async fn transcribe_file(app: AppHandle, request: LocalFileRequest) -> Resul
 
     Ok(JobResult {
         title,
-        audio_path: path.to_string_lossy().into_owned(),
+        folder: path
+            .parent()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        audio_path: Some(path.to_string_lossy().into_owned()),
+        video_path: None,
         transcript: Some(Transcript {
             text: transcript::cues_to_plain_text(&cues),
             source: "whisper".to_string(),
@@ -385,7 +429,7 @@ async fn screens_from_youtube(
     request: &JobRequest,
     out_dir: &std::path::Path,
     warnings: &mut Vec<String>,
-) -> Vec<Screen> {
+) -> (Vec<Screen>, Option<PathBuf>) {
     let keep = request.keep_video.unwrap_or(false);
     let work_dir = screens_work_dir();
     let destination = if keep { out_dir } else { work_dir.as_path() };
@@ -394,7 +438,7 @@ async fn screens_from_youtube(
         Ok(path) => path,
         Err(message) => {
             warnings.push(message);
-            return Vec::new();
+            return (Vec::new(), None);
         }
     };
 
@@ -414,17 +458,18 @@ async fn screens_from_youtube(
         Vec::new()
     };
 
-    if !keep {
-        let _ = std::fs::remove_file(&video);
-    }
-
     if request.read_screen.unwrap_or(false) && screens.is_empty() {
         warnings.push(
             "Screen reading found nothing to read in this video.".to_string(),
         );
     }
 
-    screens
+    if keep {
+        (screens, Some(video))
+    } else {
+        let _ = std::fs::remove_file(&video);
+        (screens, None)
+    }
 }
 
 /// Write whichever transcript files the user asked for.

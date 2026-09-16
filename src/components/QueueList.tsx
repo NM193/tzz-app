@@ -18,6 +18,16 @@ export function QueueList({ items, onReveal }: Props) {
             {item.error && <span className="queue__error">{item.error}</span>}
           </div>
           <div className="button-group">
+            {item.result && (
+              <button
+                type="button"
+                className="ghost-button"
+                title={item.result.folder}
+                onClick={() => onReveal(item.result!.folder)}
+              >
+                Folder
+              </button>
+            )}
             {item.result?.transcript?.filePath && (
               <button
                 type="button"

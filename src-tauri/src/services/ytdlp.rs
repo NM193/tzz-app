@@ -256,8 +256,10 @@ pub async fn download_video(
         .arg(format!(
             "download:{PROGRESS_TAG} download %(progress._percent_str)s %(progress._eta_str)s"
         ))
+        // Same shape as the MP3, so a folder reads as one lecture in two forms
+        // rather than a title and a mystery id.
         .arg("--output")
-        .arg(out_dir.join(format!("{video_id}.%(ext)s")))
+        .arg(out_dir.join("%(title).120B [%(id)s].%(ext)s"))
         .arg(url)
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -287,14 +289,19 @@ pub async fn download_video(
     find_video(out_dir, video_id).ok_or_else(|| "yt-dlp finished but wrote no video.".to_string())
 }
 
-/// The video this job downloaded, named after the id so it can be found again.
+/// The video for this id, by either name it has ever had.
+///
+/// Older downloads were named by id alone; newer ones carry the title. Both
+/// are recognised so nothing already on disk gets fetched again.
 fn find_video(dir: &Path, video_id: &str) -> Option<PathBuf> {
-    std::fs::read_dir(dir)
-        .ok()?
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| path.is_file())
-        .find(|path| path.file_stem().is_some_and(|stem| stem == video_id))
+    const VIDEO: &[&str] = &["mp4", "webm", "mkv", "mov"];
+    let marker = format!("[{video_id}]");
+
+    std::fs::read_dir(dir).ok()?.flatten().map(|entry| entry.path()).find(|path| {
+        let stem = path.file_stem().map(|s| s.to_string_lossy()).unwrap_or_default();
+        let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        VIDEO.contains(&ext.as_str()) && (stem == video_id || stem.ends_with(&marker))
+    })
 }
 
 fn handle_line(app: &AppHandle, line: &str, log: &mut Vec<String>) {
@@ -442,6 +449,14 @@ mod video_tests {
 
         assert_eq!(find_video(&dir, "abc123"), Some(dir.join("abc123.mp4")));
         assert_eq!(find_video(&dir, "nothing"), None);
+
+        // The newer naming carries the title; the id sits in brackets.
+        std::fs::write(dir.join("A Lecture [xyz789].webm"), b"x").unwrap();
+        assert_eq!(find_video(&dir, "xyz789"), Some(dir.join("A Lecture [xyz789].webm")));
+
+        // An MP3 with the same id is not the video.
+        std::fs::write(dir.join("A Lecture [mp3only].mp3"), b"x").unwrap();
+        assert_eq!(find_video(&dir, "mp3only"), None);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
