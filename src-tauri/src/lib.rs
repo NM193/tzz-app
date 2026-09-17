@@ -9,6 +9,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             services::tray::build(app.handle())?;
+            services::glass::apply(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -24,9 +25,11 @@ pub fn run() {
             commands::media::probe_video,
             commands::media::run_job,
             commands::media::transcribe_file,
+            commands::media::cancel_job,
             commands::media::combine_transcripts,
             commands::media::reveal_in_file_manager,
             commands::media::open_output_folder,
+            commands::library::list_library,
             commands::recording::list_audio_inputs,
             commands::recording::set_audio_input,
             commands::recording::toggle_recording,

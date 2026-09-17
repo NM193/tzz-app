@@ -9,6 +9,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
 use super::binaries;
+use super::cancel;
 
 /// Sentinel we prepend to yt-dlp's progress template so we can pick our own
 /// lines out of the mixed stdout/stderr stream without fragile regex on
@@ -80,11 +81,22 @@ struct RawMeta {
 pub async fn probe(url: &str) -> Result<VideoMeta, String> {
     let ytdlp = binaries::require("yt-dlp")?;
 
-    let output = Command::new(ytdlp)
+    let child = Command::new(ytdlp)
         .args(["--no-playlist", "--skip-download", "--dump-single-json", url])
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .process_group(0)
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|e| format!("Could not run yt-dlp: {e}"))?;
+    let tracked = cancel::track(child.id());
+    // No stop check here: the title lookup for a pasted link runs outside any
+    // job, when the flag may still be raised from the last stop.
+    let output = child
+        .wait_with_output()
         .await
         .map_err(|e| format!("Could not run yt-dlp: {e}"))?;
+    drop(tracked);
 
     if !output.status.success() {
         return Err(tail_of(&String::from_utf8_lossy(&output.stderr)));
@@ -180,9 +192,11 @@ pub async fn download_audio(
         .args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .process_group(0)
         .kill_on_drop(true)
         .spawn()
         .map_err(|e| format!("Could not start yt-dlp: {e}"))?;
+    let _tracked = cancel::track(child.id());
 
     let stdout = child.stdout.take().expect("stdout piped");
     let stderr = child.stderr.take().expect("stderr piped");
@@ -210,6 +224,7 @@ pub async fn download_audio(
         .wait()
         .await
         .map_err(|e| format!("yt-dlp did not finish cleanly: {e}"))?;
+    cancel::check()?;
 
     if !status.success() {
         // A failed subtitle fetch must not throw away an MP3 that is already
@@ -263,9 +278,11 @@ pub async fn download_video(
         .arg(url)
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
+        .process_group(0)
         .kill_on_drop(true)
         .spawn()
         .map_err(|e| format!("Could not download the video: {e}"))?;
+    let _tracked = cancel::track(child.id());
 
     // Same progress line as the audio download, so the meter keeps moving
     // through what is usually the longest wait in the whole job.
@@ -281,6 +298,7 @@ pub async fn download_video(
         .wait()
         .await
         .map_err(|e| format!("The video download did not finish cleanly: {e}"))?;
+    cancel::check()?;
 
     if !status.success() {
         return Err("The video could not be downloaded for screen reading.".to_string());

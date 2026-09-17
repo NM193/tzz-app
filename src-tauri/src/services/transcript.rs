@@ -16,6 +16,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
 use super::binaries;
+use super::cancel;
 use super::ytdlp::{emit, Chapter, ProgressEvent};
 
 /// How much speech goes into one timestamped paragraph.
@@ -457,16 +458,25 @@ pub async fn whisper_srt(
         ProgressEvent::stage("converting", Some("Preparing audio for Whisper".to_string())),
     );
 
-    let convert = Command::new(ffmpeg)
+    cancel::claim(&wav_path);
+    let mut convert_child = Command::new(ffmpeg)
         .args(["-y", "-i"])
         .arg(audio_path)
         .args(["-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le"])
         .arg(&wav_path)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()
+        .process_group(0)
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|e| format!("Could not run ffmpeg: {e}"))?;
+    let tracked = cancel::track(convert_child.id());
+    let convert = convert_child
+        .wait()
         .await
         .map_err(|e| format!("Could not run ffmpeg: {e}"))?;
+    drop(tracked);
+    cancel::check()?;
 
     if !convert.success() {
         return Err("ffmpeg could not prepare the audio for transcription.".to_string());
@@ -485,9 +495,11 @@ pub async fn whisper_srt(
         .arg(&out_base)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
+        .process_group(0)
         .kill_on_drop(true)
         .spawn()
         .map_err(|e| format!("Could not run whisper: {e}"))?;
+    let _tracked = cancel::track(child.id());
 
     let stderr = child.stderr.take().expect("stderr piped");
     let mut lines = BufReader::new(stderr).lines();
@@ -517,6 +529,7 @@ pub async fn whisper_srt(
         .wait()
         .await
         .map_err(|e| format!("Whisper did not finish cleanly: {e}"))?;
+    cancel::check()?;
 
     let srt_path = out_base.with_extension("srt");
     let srt = std::fs::read_to_string(&srt_path).map_err(|_| {

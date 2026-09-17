@@ -116,6 +116,14 @@ export function transcribeFile(request: LocalFileRequest): Promise<JobResult> {
   return invoke("transcribe_file", { request });
 }
 
+/**
+ * Stop the running job and delete whatever it has written so far. The job's
+ * own call then rejects with "Stopped."
+ */
+export function cancelJob(): Promise<void> {
+  return invoke("cancel_job");
+}
+
 export type CombineSection = {
   title: string;
   source: string;
@@ -214,4 +222,20 @@ export function errorMessage(error: unknown): string {
   if (typeof error === "string") return error;
   if (error instanceof Error) return error.message;
   return "Something went wrong.";
+}
+
+export type LibraryEntry = {
+  name: string;
+  path: string;
+  audioPath: string | null;
+  videoPath: string | null;
+  markdownPath: string | null;
+  pdfPath: string | null;
+  /** Seconds since the epoch. */
+  modified: number;
+};
+
+/** Every folder in the library, newest first. */
+export function listLibrary(outDir: string | null): Promise<LibraryEntry[]> {
+  return invoke("list_library", { outDir });
 }

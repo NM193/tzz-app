@@ -24,6 +24,8 @@ macOS ties permissions and settings to it.
 
 ## Project structure
 - `src/` React frontend. `src/lib/api.ts` is the only file that calls `invoke`.
+  `lib/useJobs.ts` and `lib/useRecorder.ts` hold state; `components/*View.tsx`
+  are the four screens behind the sidebar.
 - `src-tauri/src/commands/` thin Tauri command handlers, validation only.
 - `src-tauri/src/services/` all real logic:
   - `binaries` finding external tools · `ytdlp` downloading · `transcript`
@@ -70,20 +72,32 @@ These were bugs. The comments in the code say the same; this is the index.
 - **Do not edit Rust while a job is running.** The dev watcher restarts the app
   on every change, which kills the job and orphans its child processes.
 - Output goes to `~/Documents/Tzz Library`, one folder per video.
+- The window is transparent and frosted by macOS (`services/glass.rs`), so the
+  stylesheet paints tints, never an opaque background.
+- Stopping a job (`services/cancel.rs`) kills its process group and deletes
+  what it wrote. One job runs at a time, so this is a global, on purpose.
+
+## Moving to another Mac
+No updater and no signing: this app lives on one machine. To move it, copy
+the folder (or `git clone`), then `brew install yt-dlp ffmpeg whisper-cpp`,
+`xcode-select --install` for `swiftc`, install BlackHole for system audio,
+drop a Whisper `ggml-*.bin` model where Settings can find it, and run
+`npm run install:app`.
 
 ## Current status
 Working: single video and queue, MP3, transcript from captions or Whisper,
 screen text via OCR, chapters and a table of contents, markdown and PDF, one
 combined document per queue, local audio and video files, audio recording with
-a menu bar icon and level meter, automatic output-device switching.
+a menu bar icon and level meter, automatic output-device switching, stopping a
+job mid-run, a Library screen listing the output folder.
 
 Not built: summaries, courses and quizzes (see
 `docs/superpowers/specs/2026-08-30-study-material-vision.md`), playlists,
-cancelling a job mid-run, Windows support.
+Windows support.
 
 ## Commands
 - `npm run dev` -- run the app (Vite + Tauri)
 - `npm run build` -- bundle a .app / .dmg
 - `npm run install:app` -- build and replace the copy in /Applications
 - `npm run build:vite` -- typecheck the frontend only
-- `cd src-tauri && cargo test` -- 57 tests, all pure logic
+- `cd src-tauri && cargo test` -- 63 tests, all pure logic

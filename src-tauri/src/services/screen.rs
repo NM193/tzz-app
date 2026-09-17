@@ -9,11 +9,13 @@
 //! binary embedded in the app.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::os::unix::process::CommandExt;
+use std::process::{Command, Stdio};
 
 use tauri::AppHandle;
 
 use super::binaries;
+use super::cancel;
 use super::transcript::Screen;
 use super::ytdlp::{emit, ProgressEvent};
 
@@ -73,6 +75,7 @@ pub fn read_screens(app: &AppHandle, video: &Path, work_dir: &Path) -> Result<Ve
     let mut screens = Vec::new();
 
     for (index, (at_ms, frame)) in frames.into_iter().enumerate() {
+        cancel::check()?;
         emit(
             app,
             ProgressEvent {
@@ -112,7 +115,7 @@ fn extract_frames(video: &Path, work_dir: &Path) -> Result<Vec<(u64, PathBuf)>, 
     // `-skip_frame nokey` decodes only keyframes, which turns a 13x realtime
     // pass into a 48x one. Sampling every other second is far finer than any
     // lecture changes its screen.
-    let output = Command::new(ffmpeg)
+    let child = Command::new(ffmpeg)
         .arg("-skip_frame")
         .arg("nokey")
         .arg("-i")
@@ -123,8 +126,17 @@ fn extract_frames(video: &Path, work_dir: &Path) -> Result<Vec<(u64, PathBuf)>, 
         ))
         .args(["-fps_mode", "vfr", "-q:v", "3"])
         .arg(frame_dir.join("frame_%04d.jpg"))
-        .output()
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .process_group(0)
+        .spawn()
         .map_err(|e| format!("Could not read the video: {e}"))?;
+    let tracked = cancel::track(Some(child.id()));
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Could not read the video: {e}"))?;
+    drop(tracked);
+    cancel::check()?;
 
     let times = parse_frame_times(&String::from_utf8_lossy(&output.stderr));
 

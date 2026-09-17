@@ -8,20 +8,7 @@ import {
   setAudioInput,
   toggleRecording,
   type AudioInput,
-} from "../lib/api";
-
-type Props = {
-  /** Called with the saved file's path once a recording has a name. */
-  onSaved: (path: string) => void;
-  onError: (message: string) => void;
-};
-
-const LEVEL_SEGMENTS = 14;
-
-function clock(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-}
+} from "./api";
 
 /** Today's date and time, as a filename. */
 function defaultName(): string {
@@ -32,21 +19,35 @@ function defaultName(): string {
   )}-${pad(now.getMinutes())}.mp3`;
 }
 
+export function clock(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+type Handlers = {
+  /** Called with the saved file's path once a recording has a name. */
+  onSaved: (path: string) => void;
+  onError: (message: string) => void;
+};
+
 /**
- * Always on screen, and deliberately independent of the queue: a recording can
- * start while a transcription is running, and neither waits for the other.
+ * Recording state, held at the top of the app: the sidebar shows it, the
+ * Record screen drives it, and neither waits for a transcription.
  *
  * State comes from events rather than from the button's own call, because the
  * menu bar icon can start and stop a recording with this window closed.
  */
-export function RecorderBar({ onSaved, onError }: Props) {
+export function useRecorder({ onSaved, onError }: Handlers) {
   const [inputs, setInputs] = useState<AudioInput[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
   const [routedTo, setRoutedTo] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string[]>([]);
   const tick = useRef<number | null>(null);
+  const handlers = useRef({ onSaved, onError });
+  handlers.current = { onSaved, onError };
 
   function refreshInputs() {
     listAudioInputs()
@@ -85,7 +86,7 @@ export function RecorderBar({ onSaved, onError }: Props) {
       level: setLevel,
       input: setSelected,
       output: setRoutedTo,
-      error: onError,
+      error: (message) => handlers.current.onError(message),
     });
     return () => {
       unlisten.then((off) => off());
@@ -112,71 +113,30 @@ export function RecorderBar({ onSaved, onError }: Props) {
 
       if (!destination) {
         // Cancelling must never cost an hour of audio.
-        onError(`Recording kept at ${tempPath} until you save it.`);
+        handlers.current.onError(`Recording kept at ${tempPath} until you save it.`);
         return;
       }
 
-      onSaved(await saveRecording(tempPath, destination));
+      const path = await saveRecording(tempPath, destination);
+      setSaved((prev) => [path, ...prev]);
+      handlers.current.onSaved(path);
     } catch (caught) {
-      onError(errorMessage(caught));
+      handlers.current.onError(errorMessage(caught));
     }
   }
 
-  const lit = Math.round(level * LEVEL_SEGMENTS);
-
-  return (
-    <section className={`recorder ${recording ? "recorder--live" : ""}`}>
-      <span className="recorder__dot" aria-hidden="true" />
-
-      {recording ? (
-        <span className="recorder__time">{clock(elapsed)}</span>
-      ) : (
-        <span className="field-label">Record</span>
-      )}
-
-      {inputs.length === 0 ? (
-        <span className="recorder__input recorder__input--empty">No audio input found</span>
-      ) : (
-        <select
-          className="recorder__input"
-          value={selected ?? ""}
-          disabled={recording}
-          onMouseDown={refreshInputs}
-          onChange={(event) => setSelected(Number(event.target.value))}
-        >
-          {inputs.map((input) => (
-            <option key={input.index} value={input.index}>
-              {input.name}
-            </option>
-          ))}
-        </select>
-      )}
-
-      <div
-        className="level"
-        role="meter"
-        aria-label="Input level"
-        aria-valuenow={Math.round(level * 100)}
-      >
-        {Array.from({ length: LEVEL_SEGMENTS }, (_, index) => (
-          <span
-            key={index}
-            className={`level__bar ${index < lit ? "level__bar--lit" : ""} ${
-              index > LEVEL_SEGMENTS - 3 ? "level__bar--hot" : ""
-            }`}
-          />
-        ))}
-      </div>
-
-      {routedTo && (
-        <span className="recorder__routed" title={`Sound is going through ${routedTo}`}>
-          via {routedTo}
-        </span>
-      )}
-
-      <button type="button" className="ghost-button" onClick={() => void toggleRecording()}>
-        {recording ? "Stop" : "Record"}
-      </button>
-    </section>
-  );
+  return {
+    inputs,
+    selected,
+    select: setSelected,
+    refreshInputs,
+    recording,
+    elapsed,
+    level,
+    routedTo,
+    saved,
+    toggle: () => void toggleRecording(),
+  };
 }
+
+export type Recorder = ReturnType<typeof useRecorder>;

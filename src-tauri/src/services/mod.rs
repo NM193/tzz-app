@@ -1,6 +1,9 @@
 pub mod audio_output;
 pub mod binaries;
+pub mod cancel;
 pub mod combine;
+pub mod glass;
+pub mod library;
 pub mod pdf;
 pub mod recorder;
 pub mod screen;

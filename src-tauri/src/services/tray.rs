@@ -65,7 +65,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     }
 
     menu.append(&PredefinedMenuItem::separator(app)?)?;
-    menu.append(&MenuItem::with_id(app, MENU_OPEN, "Open YT MP3", true, None::<&str>)?)?;
+    menu.append(&MenuItem::with_id(app, MENU_OPEN, "Open Tzz App", true, None::<&str>)?)?;
     menu.append(&MenuItem::with_id(app, MENU_QUIT, "Quit", true, None::<&str>)?)?;
 
     Ok(menu)

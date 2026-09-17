@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use crate::services::binaries::{self, DependencyStatus};
+use crate::services::cancel;
 use crate::services::combine::{self, Section};
 use crate::services::pdf;
 use crate::services::screen;
@@ -130,6 +131,20 @@ pub async fn probe_video(url: String) -> Result<VideoMeta, String> {
 
 #[tauri::command]
 pub async fn run_job(app: AppHandle, request: JobRequest) -> Result<JobResult, String> {
+    let started = cancel::begin();
+    let result = run_job_inner(&app, request).await;
+    cancel::finish(result, started)
+}
+
+/// Stop the running job. Its half-written files are deleted before the
+/// job's own call returns.
+#[tauri::command]
+pub fn cancel_job() {
+    cancel::cancel();
+}
+
+async fn run_job_inner(app: &AppHandle, request: JobRequest) -> Result<JobResult, String> {
+    let app = app.clone();
     let url = normalize_url(&request.url)?;
     let out_dir = resolve_out_dir(request.out_dir.as_deref())?;
     let mut warnings: Vec<String> = Vec::new();
@@ -144,6 +159,7 @@ pub async fn run_job(app: AppHandle, request: JobRequest) -> Result<JobResult, S
 
     ytdlp::emit(&app, ProgressEvent::stage("probing", Some("Reading video info".into())));
     let meta = ytdlp::probe(&url).await?;
+    cancel::check()?;
 
     let job_dir = job_folder(&out_dir, &meta.title, &meta.id)?;
 
@@ -173,6 +189,7 @@ pub async fn run_job(app: AppHandle, request: JobRequest) -> Result<JobResult, S
     if let Some(output) = &output {
         warnings.extend(output.warnings.iter().cloned());
     }
+    cancel::check()?;
 
     // The video is fetched when the screen is to be read, or simply when the
     // user wants to keep it. Reading is the slow part, so it stays opt-in.
@@ -181,6 +198,7 @@ pub async fn run_job(app: AppHandle, request: JobRequest) -> Result<JobResult, S
     } else {
         (Vec::new(), None)
     };
+    cancel::check()?;
 
     let mut result_transcript: Option<Transcript> = None;
 
@@ -191,6 +209,7 @@ pub async fn run_job(app: AppHandle, request: JobRequest) -> Result<JobResult, S
             Err(message) => warnings.push(message),
         }
     }
+    cancel::check()?;
 
     let mut audio_path = None;
     if let Some(output) = &output {
@@ -304,6 +323,13 @@ async fn build_transcript(
 /// `whisper_srt` feeds it through ffmpeg itself.
 #[tauri::command]
 pub async fn transcribe_file(app: AppHandle, request: LocalFileRequest) -> Result<JobResult, String> {
+    let started = cancel::begin();
+    let result = transcribe_file_inner(&app, request).await;
+    cancel::finish(result, started)
+}
+
+async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Result<JobResult, String> {
+    let app = app.clone();
     let path = validate_audio_path(&request.path)?;
 
     let model_path = request
@@ -338,8 +364,13 @@ pub async fn transcribe_file(app: AppHandle, request: LocalFileRequest) -> Resul
     } else {
         Vec::new()
     };
+    cancel::check()?;
 
     ytdlp::emit(&app, ProgressEvent::stage("transcribing", Some(title.clone())));
+
+    // The only files this job writes; a stop takes them back.
+    cancel::claim(&transcript::transcript_path_for(&path, "md"));
+    cancel::claim(&transcript::transcript_path_for(&path, "pdf"));
 
     let srt = transcript::whisper_srt(&app, &path, &PathBuf::from(model_path), &language).await?;
     let cues = transcript::parse_srt(&srt);
@@ -433,6 +464,7 @@ async fn screens_from_youtube(
     let keep = request.keep_video.unwrap_or(false);
     let work_dir = screens_work_dir();
     let destination = if keep { out_dir } else { work_dir.as_path() };
+    cancel::claim(&work_dir);
 
     let video = match ytdlp::download_video(app, url, destination, video_id).await {
         Ok(path) => path,
@@ -634,7 +666,7 @@ fn normalize_url(raw: &str) -> Result<String, String> {
     Ok(url.to_string())
 }
 
-fn resolve_out_dir(requested: Option<&str>) -> Result<PathBuf, String> {
+pub(crate) fn resolve_out_dir(requested: Option<&str>) -> Result<PathBuf, String> {
     if let Some(dir) = requested.filter(|d| !d.trim().is_empty()) {
         return Ok(PathBuf::from(dir));
     }
@@ -653,6 +685,8 @@ fn job_folder(out_dir: &std::path::Path, title: &str, video_id: &str) -> Result<
     let trimmed: String = name.chars().take(120).collect();
 
     let folder = out_dir.join(trimmed.trim());
+    // Claimed before it is made, so a stop knows whether it was ours to remove.
+    cancel::claim(&folder);
     std::fs::create_dir_all(&folder)
         .map_err(|e| format!("Could not create a folder for this video: {e}"))?;
     Ok(folder)

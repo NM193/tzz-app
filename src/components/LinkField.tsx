@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { parseUrlList, shortenUrl, type PendingLink } from "../lib/queue";
+import { CloseIcon, LinkIcon } from "./Icons";
 
 type Props = {
   links: PendingLink[];
@@ -31,6 +32,7 @@ export function LinkField({ links, onAdd, onRemove, disabled }: Props) {
       className={`link-field ${disabled ? "link-field--disabled" : ""}`}
       onClick={() => inputRef.current?.focus()}
     >
+      <LinkIcon size={16} className="link-field__icon" />
       {links.map((link) => (
         <span
           key={link.id}
@@ -50,7 +52,7 @@ export function LinkField({ links, onAdd, onRemove, disabled }: Props) {
               onRemove(link.id);
             }}
           >
-            ×
+            <CloseIcon size={12} />
           </button>
         </span>
       ))}
@@ -60,7 +62,7 @@ export function LinkField({ links, onAdd, onRemove, disabled }: Props) {
         className="link-field__input"
         type="text"
         value={draft}
-        placeholder={links.length === 0 ? "Paste YouTube links" : ""}
+        placeholder={links.length === 0 ? "Paste YouTube links, one or many" : ""}
         spellCheck={false}
         autoComplete="off"
         disabled={disabled}

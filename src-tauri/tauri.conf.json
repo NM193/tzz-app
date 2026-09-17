@@ -13,16 +13,21 @@
     "windows": [
       {
         "title": "Tzz App",
-        "width": 640,
-        "height": 780,
-        "minWidth": 520,
-        "minHeight": 640,
-        "resizable": true
+        "label": "main",
+        "width": 1040,
+        "height": 720,
+        "minWidth": 860,
+        "minHeight": 600,
+        "resizable": true,
+        "transparent": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       }
     ],
     "security": {
       "csp": null
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,
