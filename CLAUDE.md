@@ -69,6 +69,14 @@ Settings chooses the window's surface (solid, glass, or an aurora the app
 paints itself), its tint, and the accent. There is no light theme: this palette
 has no light version, and one would be a different design.
 
+The mark is sound on the left and writing on the right -- the job, drawn.
+`scripts/make-icon.swift` is its only source: it draws the icon and the menu
+bar images with CoreGraphics (swiftc is required anyway, for the OCR helper),
+and `npx tauri icon assets/icon.png` turns the result into every size macOS
+wants. Menu bar images are templates -- black on nothing, recoloured by macOS --
+and use a simpler version of the mark, because the full one closes up below
+about 32 points.
+
 Prototypes live in `.superpowers/prototype/` and open with a double click.
 
 ## Lessons the code encodes

@@ -141,10 +141,3 @@ export const InfoIcon = (p: Props) => (
     <path d="M12 11v5M12 8h.01" />
   </svg>
 );
-
-/** The mark in the sidebar: three bars, a level meter at rest. */
-export const Logo = (p: Props) => (
-  <svg {...base({ size: 22, ...p })} strokeWidth={2.25}>
-    <path d="M6 9v6M12 5v14M18 9v6" />
-  </svg>
-);

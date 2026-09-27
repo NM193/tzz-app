@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tzz App — line-art marks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#181616; --bone:#fffddc; --muted:#7a726c; --muted-2:#bdb5ac; --caption:#8a827b;
+  --line:#2a2626; --line-2:#3a3533; --accent:#f7ab29;
+  --serif:'Instrument Serif',Georgia,serif;
+  --sans:'Geist',system-ui,sans-serif;
+  --mono:'Geist Mono',ui-monospace,monospace;
+  --w:6;             /* stroke width on a 100 grid */
+  --tile-bg:#100e0e;
+  --tile-ink:var(--bone);
+  --tile-radius:22.5%;  /* macOS squircle, near enough */
+}
+body[data-tile="amber"]{--tile-bg:var(--accent);--tile-ink:#181616}
+body[data-tile="bone"]{--tile-bg:var(--bone);--tile-ink:#181616}
+body[data-tile="none"]{--tile-bg:transparent;--tile-ink:var(--bone)}
+body[data-weight="thin"]{--w:4}
+body[data-weight="bold"]{--w:8.5}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--bone);font:400 15px/1.5 var(--sans);-webkit-font-smoothing:antialiased;user-select:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+
+.page{max-width:72rem;margin:0 auto;padding:3rem 2.5rem 8rem}
+h1{margin:0;font:400 3rem/.95 var(--serif);letter-spacing:-.03em}
+.lede{margin:.875rem 0 2.5rem;max-width:36rem;font-size:.875rem;line-height:1.55;color:var(--muted-2)}
+.eyebrow{font:500 .625rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--caption)}
+
+.marks{display:grid;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr));gap:1.25rem}
+.mark{padding:1.25rem;border:1px solid var(--line);border-radius:.75rem}
+.mark__top{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+.mark__name{font:500 .9375rem var(--sans)}
+.mark__idea{font-size:.75rem;line-height:1.45;color:var(--caption)}
+
+.sizes{display:flex;align-items:flex-end;gap:1rem}
+.tile{display:grid;place-items:center;background:var(--tile-bg);border-radius:var(--tile-radius);color:var(--tile-ink);flex:none}
+.tile--128{width:128px;height:128px}
+.tile--48{width:48px;height:48px}
+.tile--32{width:32px;height:32px}
+.tile svg{width:100%;height:100%;display:block}
+/* no tile: keep the footprint so the row stays aligned */
+body[data-tile="none"] .tile{box-shadow:inset 0 0 0 1px var(--line)}
+
+/* the menu bar: macOS recolours a template image, so it is always flat */
+.menubar{display:flex;align-items:center;gap:.5rem;height:24px;padding:0 .625rem;border-radius:.25rem;background:rgb(255 253 220 / .1)}
+.menubar svg{width:18px;height:18px;color:var(--bone)}
+.menubar span{font:500 .625rem var(--mono);letter-spacing:.1em;color:var(--caption)}
+
+.foot{display:flex;align-items:center;gap:1.25rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line)}
+.wordmark{display:flex;align-items:baseline;gap:.5rem}
+.wordmark svg{width:22px;height:22px;color:var(--bone);align-self:center}
+.wordmark b{font:400 1.5rem/1 var(--serif);letter-spacing:-.02em}
+.wordmark em{font:500 .5625rem var(--mono);font-style:normal;letter-spacing:.14em;text-transform:uppercase;color:var(--caption)}
+
+.proto{position:fixed;z-index:60;left:0;right:0;bottom:1rem;width:fit-content;max-width:calc(100% - 2rem);margin:0 auto;display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem .875rem;align-items:center;padding:.5rem .625rem;border-radius:1.125rem;background:rgb(14 13 13/.92);border:1px solid var(--line-2);backdrop-filter:blur(12px)}
+.grp{display:flex;gap:.1875rem;align-items:center}
+.grp>span{font:500 .625rem var(--mono);letter-spacing:.14em;color:var(--caption);padding:0 .375rem 0 .25rem;text-transform:uppercase}
+.proto button{font:500 .6875rem var(--mono);letter-spacing:.06em;color:var(--muted-2);border-radius:999px;padding:.4375rem .625rem;white-space:nowrap}
+.proto button.on{background:var(--bone);color:var(--bg)}
+</style>
+</head>
+<body data-tile="dark" data-weight="regular">
+
+<div class="page">
+  <h1>Six marks</h1>
+  <p class="lede">
+    All line art, all one stroke weight, all drawn on the same grid. Each one is
+    shown at Dock size, at Finder size, at the size a list uses, and as the flat
+    template macOS recolours for the menu bar. Switches are at the bottom.
+  </p>
+
+  <div class="marks" id="marks"></div>
+</div>
+
+<div class="proto">
+  <span class="grp"><span>Tile</span>
+    <button data-set="tile" data-val="dark" class="on">dark</button>
+    <button data-set="tile" data-val="amber">amber</button>
+    <button data-set="tile" data-val="bone">bone</button>
+    <button data-set="tile" data-val="none">none</button>
+  </span>
+  <span class="grp"><span>Stroke</span>
+    <button data-set="weight" data-val="thin">thin</button>
+    <button data-set="weight" data-val="regular" class="on">regular</button>
+    <button data-set="weight" data-val="bold">bold</button>
+  </span>
+</div>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+
+/*
+  Each mark is a set of paths on a 100 grid, plus a simpler set for small
+  sizes -- a stroke that reads at 128px can close up at 18px.
+*/
+const MARKS = [
+  {
+    id:'fork',
+    name:'Tuning fork T',
+    idea:'The letter the app is named after, and the thing that makes a tone. Reads as a T at any size.',
+    full:`<path d="M26 24H74"/><path d="M50 24v30"/>
+          <path d="M50 54c0 12-12 12-12 24"/><path d="M50 54c0 12 12 12 12 24"/>`,
+    small:`<path d="M26 26H74"/><path d="M50 26v26"/>
+           <path d="M50 52c0 12-11 12-11 22"/><path d="M50 52c0 12 11 12 11 22"/>`
+  },
+  {
+    id:'wave',
+    name:'Sound into text',
+    idea:'What the app does, literally: three bars of sound on the left, three lines of writing on the right.',
+    full:`<path d="M22 38v24"/><path d="M34 26v48"/><path d="M46 42v16"/>
+          <path d="M60 36h18"/><path d="M60 50h18"/><path d="M60 64h11"/>`,
+    small:`<path d="M24 34v32"/><path d="M38 26v48"/>
+           <path d="M56 38h22"/><path d="M56 62h14"/>`
+  },
+  {
+    id:'play',
+    name:'Play into page',
+    idea:'A lecture turning into a document. The most literal of the six, and the least like a letter.',
+    full:`<path d="M20 32l22 18-22 18z"/>
+          <path d="M56 20h18l10 10v50H56z"/><path d="M74 20v10h10"/>`,
+    small:`<path d="M20 32l22 18-22 18z"/>
+           <path d="M56 22h18l10 10v46H56z"/>`
+  },
+  {
+    id:'scrub',
+    name:'Playhead over text',
+    idea:'A paragraph with the moment it was said marked on it. The timestamps are the whole idea of the transcript.',
+    full:`<path d="M20 30h50"/><path d="M20 44h60"/><path d="M20 58h44"/><path d="M20 72h54"/>
+          <path d="M52 20v60"/>`,
+    small:`<path d="M20 32h52"/><path d="M20 50h58"/><path d="M20 68h44"/>
+           <path d="M52 22v56"/>`
+  },
+  {
+    id:'bracket',
+    name:'Captured sound',
+    idea:'Brackets holding a waveform: everything that was said, kept. Closest to a piece of punctuation.',
+    full:`<path d="M34 24H24v52h10"/><path d="M66 24h10v52H66"/>
+          <path d="M36 50c5-18 9 18 14 0s9 18 14 0"/>`,
+    small:`<path d="M34 26H24v48h10"/><path d="M66 26h10v48H66"/>
+           <path d="M38 50c6-16 12 16 18 0"/>`
+  },
+  {
+    id:'serifT',
+    name:'Serif T on a rule',
+    idea:'The wordmark, reduced. Matches the headings exactly, which no other mark here does.',
+    full:`<path d="M28 26h44"/><path d="M50 26v40"/><path d="M38 66h24"/>
+          <path d="M20 80h60"/>`,
+    small:`<path d="M28 28h44"/><path d="M50 28v38"/><path d="M38 66h24"/>
+           <path d="M20 80h60"/>`
+  },
+];
+
+function svg(paths, extra=''){
+  return `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor"
+    stroke-width="var(--w)" stroke-linecap="round" stroke-linejoin="round" ${extra}>${paths}</svg>`;
+}
+
+$('#marks').innerHTML = MARKS.map(m => `
+  <section class="mark">
+    <div class="mark__top">
+      <span class="mark__name">${m.name}</span>
+      <span class="eyebrow">${m.id}</span>
+    </div>
+
+    <div class="sizes">
+      <span class="tile tile--128">${svg(m.full)}</span>
+      <span class="tile tile--48">${svg(m.full)}</span>
+      <span class="tile tile--32">${svg(m.small)}</span>
+      <span class="menubar">${svg(m.small)}<span>menu bar</span></span>
+    </div>
+
+    <div class="foot">
+      <span class="wordmark">${svg(m.small)}<b>Tzz</b><em>Lectures to notes</em></span>
+    </div>
+
+    <p class="mark__idea" style="margin:.875rem 0 0">${m.idea}</p>
+  </section>
+`).join('');
+
+$$('.proto button').forEach(b=>b.onclick=()=>{
+  const {set,val}=b.dataset;
+  document.body.dataset[set]=val;
+  $$(`.proto [data-set="${set}"]`).forEach(x=>x.classList.toggle('on',x===b));
+});
+</script>
+</body>
+</html>
