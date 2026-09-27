@@ -1,4 +1,6 @@
 import { revealInFileManager, type LibraryEntry, type TranscriptDocument } from "../lib/api";
+import type { Scan } from "../lib/find";
+import { FindField } from "./FindField";
 import { Check } from "./Controls";
 
 type Props = {
@@ -10,6 +12,11 @@ type Props = {
   onGoTo: (index: number) => void;
   /** Which chapter the reader is currently inside. */
   here: number;
+  find: string;
+  onFind: (value: string) => void;
+  found: Scan;
+  hit: number;
+  onStep: (by: number) => void;
 };
 
 /**
@@ -25,12 +32,25 @@ export function ReaderControls({
   onBack,
   onGoTo,
   here,
+  find,
+  onFind,
+  found,
+  hit,
+  onStep,
 }: Props) {
   return (
     <div className="side__tools">
       <button type="button" className="ghost ghost--small" onClick={onBack}>
         ← Library
       </button>
+
+      <FindField
+        value={find}
+        onChange={onFind}
+        total={found.total}
+        hit={hit}
+        onStep={onStep}
+      />
 
       {doc && doc.chapters.some((chapter) => chapter.title) && (
         <>
@@ -46,7 +66,11 @@ export function ReaderControls({
                     title={chapter.title}
                   >
                     <span>{chapter.title}</span>
-                    {chapter.at && <i>{chapter.at}</i>}
+                    {found.perChapter[index] > 0 ? (
+                      <i data-found>{found.perChapter[index]}</i>
+                    ) : (
+                      chapter.at && <i>{chapter.at}</i>
+                    )}
                   </button>
                 </li>
               ) : null,

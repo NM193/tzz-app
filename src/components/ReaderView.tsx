@@ -6,6 +6,7 @@ import {
   type LibraryEntry,
   type TranscriptDocument,
 } from "../lib/api";
+import { parts as split, type Scan } from "../lib/find";
 import { drawRule } from "../lib/motion";
 
 type Props = {
@@ -17,12 +18,46 @@ type Props = {
   onArrived: () => void;
   /** Which chapter is at the top of the view. */
   onHere: (index: number) => void;
+  find: string;
+  /** Where every match is, numbered in reading order. */
+  scan: Scan;
+  /** The match to scroll to and light up. */
+  hit: number;
 };
 
 /** Chapter headings are anchors; the sidebar scrolls the stage to them. */
 export const chapterId = (index: number) => `chapter-${index}`;
 
-export function ReaderView({ entry, showScreens, onLoaded, goTo, onArrived, onHere }: Props) {
+/** One line, with the matches marked and numbered from `base`. */
+function Line({ text, find, base }: { text: string; find: string; base: number }) {
+  if (!find.trim()) return <>{text}</>;
+  let n = base;
+  return (
+    <>
+      {split(text, find).map((part, index) =>
+        part.hit ? (
+          <mark key={index} data-hit={n++}>
+            {part.text}
+          </mark>
+        ) : (
+          <span key={index}>{part.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+export function ReaderView({
+  entry,
+  showScreens,
+  onLoaded,
+  goTo,
+  onArrived,
+  onHere,
+  find,
+  scan,
+  hit,
+}: Props) {
   const [doc, setDoc] = useState<TranscriptDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -80,6 +115,22 @@ export function ReaderView({ entry, showScreens, onLoaded, goTo, onArrived, onHe
     return () => observer.disconnect();
   }, [doc]);
 
+  // The current match is scrolled to rather than searched for again: every
+  // match carries its number, so this is one lookup.
+  useEffect(() => {
+    if (!find.trim()) return;
+    const found = document.querySelector<HTMLElement>(`[data-hit="${hit}"]`);
+    if (!found) return;
+    for (const other of document.querySelectorAll("[data-here-hit]")) {
+      other.removeAttribute("data-here-hit");
+    }
+    found.setAttribute("data-here-hit", "");
+    found.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "center",
+    });
+  }, [hit, find, doc, showScreens]);
+
   useEffect(() => {
     if (goTo === null) return;
     document.getElementById(chapterId(goTo))?.scrollIntoView({
@@ -105,6 +156,7 @@ export function ReaderView({ entry, showScreens, onLoaded, goTo, onArrived, onHe
 
   if (!doc) return <p className="empty">Opening…</p>;
 
+
   return (
     <article className="reader" ref={box}>
       <h1 className="title reader__title">{doc.title || entry.name}</h1>
@@ -122,25 +174,21 @@ export function ReaderView({ entry, showScreens, onLoaded, goTo, onArrived, onHe
           )}
 
           {chapter.blocks.map((block, k) => {
+            const base = scan.offsets[index]?.[k] ?? 0;
+
             if (block.kind === "screen") {
               return showScreens ? (
                 <p key={k} className="reader__screen">
                   <span className="reader__stamp">{block.at}</span>
-                  {block.text}
+                  <Line text={block.text} find={find} base={base} />
                 </p>
               ) : null;
             }
-            if (block.kind === "plain") {
-              return (
-                <p key={k} className="reader__said">
-                  {block.text}
-                </p>
-              );
-            }
+
             return (
               <p key={k} className="reader__said">
-                <span className="reader__stamp">{block.at}</span>
-                {block.text}
+                {block.kind === "said" && <span className="reader__stamp">{block.at}</span>}
+                <Line text={block.text} find={find} base={base} />
               </p>
             );
           })}

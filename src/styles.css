@@ -1886,3 +1886,95 @@ mark {
   color: inherit;
   text-align: left;
 }
+
+/* ---------- find in the open document ------------------------------------ */
+
+.find {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 2.25rem;
+  margin-top: 1rem;
+  padding: 0 0.375rem 0 0.625rem;
+  border: 1px solid var(--line-2);
+  border-radius: 0.5rem;
+  transition: border-color 0.25s;
+}
+
+.find:focus-within {
+  border-color: var(--accent);
+}
+
+/* Something was typed and nothing matched: say so with the border. */
+.find[data-empty] {
+  border-color: var(--line-2);
+}
+
+.find input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--bone);
+  font: 400 0.8125rem var(--font-sans);
+  user-select: text;
+}
+
+.find input::placeholder {
+  color: var(--caption);
+}
+
+.find input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.find__count {
+  flex: none;
+  font: 500 0.625rem var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--caption);
+}
+
+.find[data-empty] .find__count {
+  color: var(--accent);
+}
+
+.find__step {
+  display: flex;
+  flex: none;
+}
+
+.find__step button,
+.find__clear {
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: none;
+  color: var(--caption);
+  font: 400 0.9375rem/1 var(--font-sans);
+  transition:
+    color 0.2s,
+    background 0.2s;
+}
+
+.find__step button:hover,
+.find__clear:hover {
+  background: rgb(255 253 220 / 0.08);
+  color: var(--bone);
+}
+
+/* The match you are on, as opposed to the rest. */
+.reader mark[data-here-hit] {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.toc button i[data-found] {
+  opacity: 1;
+  color: var(--accent);
+}

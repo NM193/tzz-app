@@ -146,7 +146,8 @@ combined document per queue, local audio and video files, audio recording with
 a menu bar icon and level meter, automatic output-device switching, stopping a
 job mid-run, a Library that searches and filters what is on disk, a picture per
 folder, a notification when a run ends, reading a transcript inside the app,
-unpacking a playlist link into the videos it holds.
+unpacking a playlist link into the videos it holds, finding a word in an open
+document.
 
 Not built: Windows support.
 

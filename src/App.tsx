@@ -17,6 +17,7 @@ import { ReaderControls } from "./components/ReaderControls";
 import { ReaderView } from "./components/ReaderView";
 import type { LibraryEntry, TranscriptDocument } from "./lib/api";
 import { useLibrary } from "./lib/useLibrary";
+import { scan } from "./lib/find";
 
 export default function App() {
   const [view, setView] = useState<View>("convert");
@@ -38,6 +39,20 @@ export default function App() {
   const [showScreens, setShowScreens] = useState(true);
   const [goTo, setGoTo] = useState<number | null>(null);
   const [here, setHere] = useState(0);
+  const [find, setFind] = useState("");
+  const [hit, setHit] = useState(0);
+
+  // One pass over the document numbers every match, so the reader can mark
+  // them and the contents can say how many each chapter holds.
+  const found = useMemo(() => scan(doc, find, showScreens), [doc, find, showScreens]);
+
+  // A new query starts at the first match, never wherever the last one ended.
+  useEffect(() => setHit(0), [find, doc]);
+
+  function step(by: number) {
+    if (found.total === 0) return;
+    setHit((at) => (at + by + found.total) % found.total);
+  }
   const recorder = useRecorder({
     // A finished recording joins the queue like any dropped file.
     onSaved: (path) => {
@@ -204,9 +219,17 @@ export default function App() {
               doc={doc}
               showScreens={showScreens}
               onShowScreens={setShowScreens}
-              onBack={() => setReading(null)}
+              onBack={() => {
+                setReading(null);
+                setFind("");
+              }}
               onGoTo={setGoTo}
               here={here}
+              find={find}
+              onFind={setFind}
+              found={found}
+              hit={hit}
+              onStep={step}
             />
           ) : (
             <LibraryControls library={library} />
@@ -237,6 +260,9 @@ export default function App() {
               goTo={goTo}
               onArrived={() => setGoTo(null)}
               onHere={setHere}
+              find={find}
+              scan={found}
+              hit={hit}
             />
           ) : (
             <LibraryView
