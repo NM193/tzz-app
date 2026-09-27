@@ -33,6 +33,7 @@ pub fn run() {
             commands::media::open_output_folder,
             commands::library::list_library,
             commands::library::ensure_thumbnail,
+            commands::library::open_document,
             commands::window::set_glass,
             commands::recording::list_audio_inputs,
             commands::recording::set_audio_input,

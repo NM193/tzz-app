@@ -12,6 +12,9 @@ import { RecordView } from "./components/RecordView";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar, type View } from "./components/Sidebar";
 import { LibraryControls } from "./components/LibraryControls";
+import { ReaderControls } from "./components/ReaderControls";
+import { ReaderView } from "./components/ReaderView";
+import type { LibraryEntry, TranscriptDocument } from "./lib/api";
 import { useLibrary } from "./lib/useLibrary";
 
 export default function App() {
@@ -26,6 +29,14 @@ export default function App() {
   // The results list, shared: the hook measures it for the column re-flow.
   const resultsRef = useRef<HTMLOListElement>(null);
   const library = useLibrary(settings, libraryVersion, resultsRef);
+
+  // The reader is a state of the Library, not a fifth screen: you get there by
+  // opening something, and Back puts you where you were.
+  const [reading, setReading] = useState<LibraryEntry | null>(null);
+  const [doc, setDoc] = useState<TranscriptDocument | null>(null);
+  const [showScreens, setShowScreens] = useState(true);
+  const [goTo, setGoTo] = useState<number | null>(null);
+  const [here, setHere] = useState(0);
   const recorder = useRecorder({
     // A finished recording joins the queue like any dropped file.
     onSaved: (path) => {
@@ -141,7 +152,20 @@ export default function App() {
   return (
     <div className={`app ${dragging ? "app--dragging" : ""}`}>
       <Sidebar view={view} onNavigate={setView} status={status}>
-        {view === "library" && <LibraryControls library={library} />}
+        {view === "library" &&
+          (reading ? (
+            <ReaderControls
+              entry={reading}
+              doc={doc}
+              showScreens={showScreens}
+              onShowScreens={setShowScreens}
+              onBack={() => setReading(null)}
+              onGoTo={setGoTo}
+              here={here}
+            />
+          ) : (
+            <LibraryControls library={library} />
+          ))}
       </Sidebar>
 
       <main className="stage">
@@ -159,9 +183,27 @@ export default function App() {
           />
         )}
         {view === "record" && <RecordView recorder={recorder} jobs={jobs} />}
-        {view === "library" && (
-          <LibraryView settings={settings} library={library} box={resultsRef} />
-        )}
+        {view === "library" &&
+          (reading ? (
+            <ReaderView
+              entry={reading}
+              showScreens={showScreens}
+              onLoaded={setDoc}
+              goTo={goTo}
+              onArrived={() => setGoTo(null)}
+              onHere={setHere}
+            />
+          ) : (
+            <LibraryView
+              settings={settings}
+              library={library}
+              box={resultsRef}
+              onOpen={(entry) => {
+                setHere(0);
+                setReading(entry);
+              }}
+            />
+          ))}
         {view === "settings" && (
           <SettingsView settings={settings} update={update} deps={deps} onError={jobs.setError} />
         )}

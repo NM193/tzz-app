@@ -254,3 +254,27 @@ export function listLibrary(outDir: string | null): Promise<LibraryEntry[]> {
 export function ensureThumbnail(path: string): Promise<string | null> {
   return invoke("ensure_thumbnail", { path });
 }
+
+export type DocumentBlock =
+  | { kind: "said"; at: string; text: string }
+  | { kind: "screen"; at: string; text: string }
+  | { kind: "plain"; text: string };
+
+export type DocumentChapter = {
+  title: string;
+  at: string | null;
+  blocks: DocumentBlock[];
+};
+
+export type TranscriptDocument = {
+  title: string;
+  meta: string[];
+  chapters: DocumentChapter[];
+  /** Words that were actually said, for the line under the title. */
+  words: number;
+};
+
+/** A transcript, parsed for reading inside the app. */
+export function openDocument(path: string): Promise<TranscriptDocument> {
+  return invoke("open_document", { path });
+}

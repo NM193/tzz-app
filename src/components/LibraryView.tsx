@@ -15,6 +15,8 @@ type Props = {
   settings: Settings;
   library: Library;
   box: RefObject<HTMLOListElement>;
+  /** Open a folder's transcript in the reader. */
+  onOpen: (entry: LibraryEntry) => void;
 };
 
 function when(seconds: number): string {
@@ -26,7 +28,7 @@ function when(seconds: number): string {
 }
 
 /** Only the results. The controls live in the sidebar. */
-export function LibraryView({ settings, library, box }: Props) {
+export function LibraryView({ settings, library, box, onOpen }: Props) {
   const { entries, error, matching, query, layout, cols, rows } = library;
 
   const byPath = useMemo(
@@ -88,8 +90,10 @@ export function LibraryView({ settings, library, box }: Props) {
                 type="button"
                 className="card__cover"
                 data-cover
-                title={entry.path}
-                onClick={() => revealInFileManager(entry.path)}
+                title={entry.markdownPath ? "Read the transcript" : entry.path}
+                onClick={() =>
+                  entry.markdownPath ? onOpen(entry) : revealInFileManager(entry.path)
+                }
               >
                 {entry.posterPath ? (
                   <img src={convertFileSrc(entry.posterPath)} alt="" loading="lazy" />
@@ -130,7 +134,13 @@ export function LibraryView({ settings, library, box }: Props) {
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <span className="row__title" data-part>
-                  <Marked text={entry.name} query={query} />
+                  {entry.markdownPath ? (
+                    <button type="button" className="row__open" onClick={() => onOpen(entry)}>
+                      <Marked text={entry.name} query={query} />
+                    </button>
+                  ) : (
+                    <Marked text={entry.name} query={query} />
+                  )}
                 </span>
                 <span className="row__meta" data-part>
                   {when(entry.modified)}

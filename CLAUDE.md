@@ -29,7 +29,8 @@ macOS ties permissions and settings to it.
 - `src-tauri/src/commands/` thin Tauri command handlers, validation only.
 - `src-tauri/src/services/` all real logic:
   - `binaries` finding external tools · `ytdlp` downloading · `transcript`
-    parsing and formatting · `screen` reading text off video · `pdf` ·
+    parsing and formatting · `document` parsing one back for the reader ·
+    `screen` reading text off video · `pdf` ·
     `combine` stitching a queue into one document · `recorder` ·
     `audio_output` CoreAudio · `tray` the menu bar icon · `cancel` stopping a
     job and deleting what it wrote · `library` reading the output folder ·
@@ -49,6 +50,9 @@ macOS ties permissions and settings to it.
 - User-facing error strings are plain sentences, not debug output.
 - Captions and Whisper both produce SRT so there is exactly one formatting
   path. Do not add a second one that skips the timings.
+- `transcript.rs` writes the document and `document.rs` reads it back. They are
+  one format and belong together: change the shape in one, change both, and the
+  tests in `document.rs` will say so.
 
 ## Design
 The look is documented in `docs/design-reference-work.md`, extracted from
@@ -136,9 +140,9 @@ screen text via OCR, chapters and a table of contents, markdown and PDF, one
 combined document per queue, local audio and video files, audio recording with
 a menu bar icon and level meter, automatic output-device switching, stopping a
 job mid-run, a Library that searches and filters what is on disk, a picture per
-folder, a notification when a run ends.
+folder, a notification when a run ends, reading a transcript inside the app.
 
-Not built: a reader inside the app, playlists, Windows support.
+Not built: playlists, Windows support.
 
 ## Commands
 - `npm run dev` -- run the app (Vite + Tauri)
