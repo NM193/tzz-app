@@ -99,6 +99,11 @@ These were bugs. The comments in the code say the same; this is the index.
   output back.
 - **OCR is cached** in `screens.json` beside the video. Reading an hour costs
   twelve minutes and never changes.
+- **A playlist link is `/playlist?list=`, and nothing else.** A watch link
+  carries a `list` too -- that is the video you clicked from inside a playlist.
+  Unpacking those would turn one pasted link into forty pills. The listing is
+  read with `--flat-playlist`, one request for the whole thing, which also
+  supplies every title: reading them one by one is how you earn an HTTP 429.
 - **`--no-part` plus an existing file is a trap.** yt-dlp treats a finished
   download as an interrupted one and fails resuming past its end (HTTP 416).
   Check for the file first.
@@ -140,9 +145,10 @@ screen text via OCR, chapters and a table of contents, markdown and PDF, one
 combined document per queue, local audio and video files, audio recording with
 a menu bar icon and level meter, automatic output-device switching, stopping a
 job mid-run, a Library that searches and filters what is on disk, a picture per
-folder, a notification when a run ends, reading a transcript inside the app.
+folder, a notification when a run ends, reading a transcript inside the app,
+unpacking a playlist link into the videos it holds.
 
-Not built: playlists, Windows support.
+Not built: Windows support.
 
 ## Commands
 - `npm run dev` -- run the app (Vite + Tauri)

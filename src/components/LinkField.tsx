@@ -40,7 +40,14 @@ export function LinkField({ links, onAdd, onRemove, disabled }: Props) {
           }`}
           title={link.url}
         >
-          <b>{link.title ?? (link.failed ? shortenUrl(link.url) : "reading title…")}</b>
+          <b>
+            {link.title ??
+              (link.failed
+                ? shortenUrl(link.url)
+                : link.playlist
+                  ? "opening playlist…"
+                  : "reading title…")}
+          </b>
           <button
             type="button"
             className="pill__remove"

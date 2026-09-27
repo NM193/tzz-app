@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { checkDependencies, defaultWhisperModel, setGlass, type DependencyStatus } from "./lib/api";
-import { fileItem, pendingLink, type PendingLink } from "./lib/queue";
-import { probeVideo } from "./lib/api";
+import { fileItem, isPlaylist, knownLink, pendingLink, type PendingLink } from "./lib/queue";
+import { errorMessage, probePlaylist, probeVideo } from "./lib/api";
 import { loadSettings, saveSettings, type Settings } from "./lib/settings";
 import { STAGE_LABEL, useJobs } from "./lib/useJobs";
 import { clock, useRecorder } from "./lib/useRecorder";
@@ -12,6 +12,7 @@ import { RecordView } from "./components/RecordView";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar, type View } from "./components/Sidebar";
 import { LibraryControls } from "./components/LibraryControls";
+import { PLAYLIST_LIMIT } from "./lib/queue";
 import { ReaderControls } from "./components/ReaderControls";
 import { ReaderView } from "./components/ReaderView";
 import type { LibraryEntry, TranscriptDocument } from "./lib/api";
@@ -108,24 +109,68 @@ export default function App() {
     if (jobs.stage === "done") setLibraryVersion((v) => v + 1);
   }, [jobs.stage]);
 
-  /// Titles are read in the background; a link stays usable either way.
-  function addLinks(urls: string[]) {
-    setLinks((prev) => {
-      const known = new Set(prev.map((l) => l.url));
-      const fresh = urls.filter((url) => !known.has(url)).map(pendingLink);
+  // The links on screen, for de-duplicating a paste without reading state
+  // inside an updater -- StrictMode runs those twice.
+  const linksRef = useRef<PendingLink[]>([]);
+  linksRef.current = links;
 
-      for (const link of fresh) {
-        probeVideo(link.url)
-          .then((meta) =>
-            setLinks((all) => all.map((l) => (l.id === link.id ? { ...l, title: meta.title } : l))),
-          )
-          .catch(() =>
-            setLinks((all) => all.map((l) => (l.id === link.id ? { ...l, failed: true } : l))),
-          );
+  /**
+   * A pasted link becomes a pill straight away and reads its own title in the
+   * background. A playlist link becomes one pill that turns into all of them.
+   */
+  function addLinks(urls: string[]) {
+    const known = new Set(linksRef.current.map((l) => l.url));
+    const fresh = urls
+      .filter((url) => !known.has(url))
+      .map((url) => (isPlaylist(url) ? { ...pendingLink(url), playlist: true } : pendingLink(url)));
+
+    if (fresh.length === 0) return;
+    setLinks((prev) => [...prev, ...fresh]);
+
+    for (const link of fresh) {
+      if (link.playlist) void unpack(link);
+      else void readTitle(link);
+    }
+  }
+
+  async function readTitle(link: PendingLink) {
+    try {
+      const meta = await probeVideo(link.url);
+      setLinks((all) => all.map((l) => (l.id === link.id ? { ...l, title: meta.title } : l)));
+    } catch {
+      setLinks((all) => all.map((l) => (l.id === link.id ? { ...l, failed: true } : l)));
+    }
+  }
+
+  /** One playlist pill becomes a pill per video, titles already known. */
+  async function unpack(link: PendingLink) {
+    try {
+      const playlist = await probePlaylist(link.url);
+      if (playlist.items.length === 0) {
+        setLinks((all) => all.map((l) => (l.id === link.id ? { ...l, failed: true } : l)));
+        jobs.setError("That playlist has nothing in it that can be fetched.");
+        return;
       }
 
-      return [...prev, ...fresh];
-    });
+      setLinks((all) => {
+        const known = new Set(all.filter((l) => l.id !== link.id).map((l) => l.url));
+        const added = playlist.items
+          .filter((item) => !known.has(item.url))
+          .map((item) => knownLink(item.url, item.title));
+        const at = all.findIndex((l) => l.id === link.id);
+        if (at === -1) return all;
+        return [...all.slice(0, at), ...added, ...all.slice(at + 1)];
+      });
+
+      if (playlist.items.length >= PLAYLIST_LIMIT) {
+        jobs.setError(
+          `That playlist is longer than ${PLAYLIST_LIMIT} videos. The first ${PLAYLIST_LIMIT} were added.`,
+        );
+      }
+    } catch (caught) {
+      setLinks((all) => all.map((l) => (l.id === link.id ? { ...l, failed: true } : l)));
+      jobs.setError(errorMessage(caught));
+    }
   }
 
   const missing = useMemo(

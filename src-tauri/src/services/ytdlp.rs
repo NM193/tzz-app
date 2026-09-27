@@ -76,6 +76,96 @@ struct RawMeta {
     chapters: Option<Vec<Chapter>>,
 }
 
+/// One video inside a playlist, as the flat listing reports it.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistItem {
+    pub id: String,
+    pub title: String,
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Playlist {
+    pub title: String,
+    pub items: Vec<PlaylistItem>,
+}
+
+#[derive(Deserialize)]
+struct RawPlaylist {
+    title: Option<String>,
+    #[serde(default)]
+    entries: Vec<RawEntry>,
+}
+
+#[derive(Deserialize)]
+struct RawEntry {
+    id: Option<String>,
+    title: Option<String>,
+}
+
+/// A playlist beyond this is not a course, it is a channel dump. Taking the
+/// first hundred keeps the link field usable and says so.
+pub const PLAYLIST_LIMIT: usize = 100;
+
+/// Read what is in a playlist without touching a single video.
+///
+/// `--flat-playlist` is the whole point: it asks YouTube once for the listing
+/// instead of extracting every video, so a fifty-lecture course comes back in
+/// a second or two rather than a minute.
+pub async fn probe_playlist(url: &str) -> Result<Playlist, String> {
+    let ytdlp = binaries::require("yt-dlp")?;
+
+    let output = Command::new(ytdlp)
+        .args(["--flat-playlist", "--skip-download", "--dump-single-json", url])
+        .output()
+        .await
+        .map_err(|e| format!("Could not run yt-dlp: {e}"))?;
+
+    if !output.status.success() {
+        return Err(tail_of(&String::from_utf8_lossy(&output.stderr)));
+    }
+
+    let raw: RawPlaylist = serde_json::from_slice(&output.stdout)
+        .map_err(|_| "That link did not come back as a playlist.".to_string())?;
+
+    Ok(Playlist {
+        title: raw.title.unwrap_or_else(|| "Playlist".to_string()),
+        items: playlist_items(raw.entries),
+    })
+}
+
+/// Keep the videos that can actually be fetched.
+///
+/// A playlist carries its deleted and private entries too, with no id or a
+/// placeholder title. Queuing those would be ten failures the user has to read.
+fn playlist_items(entries: Vec<RawEntry>) -> Vec<PlaylistItem> {
+    entries
+        .into_iter()
+        .filter_map(|entry| {
+            let id = entry.id?;
+            let title = entry.title?;
+            if id.is_empty() || is_unavailable(&title) {
+                return None;
+            }
+            Some(PlaylistItem {
+                url: format!("https://www.youtube.com/watch?v={id}"),
+                id,
+                title,
+            })
+        })
+        .take(PLAYLIST_LIMIT)
+        .collect()
+}
+
+fn is_unavailable(title: &str) -> bool {
+    matches!(
+        title.trim(),
+        "[Private video]" | "[Deleted video]" | "[Unavailable video]" | ""
+    )
+}
+
 /// Read video metadata without downloading anything.
 /// Also tells the UI up front whether a transcript can come from captions.
 pub async fn probe(url: &str) -> Result<VideoMeta, String> {
@@ -482,5 +572,42 @@ mod video_tests {
         assert_eq!(find_video(&dir, "mp3only"), None);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod playlist_tests {
+    use super::*;
+
+    fn entry(id: &str, title: &str) -> RawEntry {
+        RawEntry { id: Some(id.to_string()), title: Some(title.to_string()) }
+    }
+
+    #[test]
+    fn builds_a_watch_link_for_every_video() {
+        let items = playlist_items(vec![entry("abc", "Lecture 1"), entry("def", "Lecture 2")]);
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].url, "https://www.youtube.com/watch?v=abc");
+        assert_eq!(items[1].title, "Lecture 2");
+    }
+
+    #[test]
+    fn leaves_out_what_cannot_be_fetched() {
+        let items = playlist_items(vec![
+            entry("abc", "Lecture 1"),
+            entry("xxx", "[Private video]"),
+            entry("yyy", "[Deleted video]"),
+            RawEntry { id: None, title: Some("no id".into()) },
+            entry("def", "Lecture 2"),
+        ]);
+        let titles: Vec<&str> = items.iter().map(|i| i.title.as_str()).collect();
+        assert_eq!(titles, vec!["Lecture 1", "Lecture 2"]);
+    }
+
+    #[test]
+    fn a_channel_dump_is_cut_to_the_limit() {
+        let many: Vec<RawEntry> =
+            (0..250).map(|n| entry(&format!("id{n}"), &format!("Video {n}"))).collect();
+        assert_eq!(playlist_items(many).len(), PLAYLIST_LIMIT);
     }
 }

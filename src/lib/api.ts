@@ -108,6 +108,22 @@ export function probeVideo(url: string): Promise<VideoMeta> {
   return invoke("probe_video", { url });
 }
 
+export type PlaylistItem = {
+  id: string;
+  title: string;
+  url: string;
+};
+
+export type Playlist = {
+  title: string;
+  items: PlaylistItem[];
+};
+
+/** What is in a playlist, without fetching any of it. */
+export function probePlaylist(url: string): Promise<Playlist> {
+  return invoke("probe_playlist", { url });
+}
+
 export function runJob(request: JobRequest): Promise<JobResult> {
   return invoke("run_job", { request });
 }

@@ -55,10 +55,37 @@ export type PendingLink = {
   title: string | null;
   /** The probe failed. Still queueable -- the job may well work anyway. */
   failed: boolean;
+  /** A playlist waiting to be unpacked into the videos it holds. */
+  playlist?: boolean;
 };
 
 export function pendingLink(url: string): PendingLink {
   return { id: crypto.randomUUID(), url, title: null, failed: false };
+}
+
+/** Mirrors PLAYLIST_LIMIT in src-tauri/src/services/ytdlp.rs. */
+export const PLAYLIST_LIMIT = 100;
+
+/**
+ * A link to a whole playlist, rather than one video.
+ *
+ * Only `/playlist?list=...` counts. A watch link often carries a `list` as
+ * well -- that is the video you clicked from inside a playlist, and expanding
+ * it into forty pills is not what anyone meant by pasting it.
+ */
+export function isPlaylist(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (!/(^|\.)(youtube\.com|youtu\.be)$/.test(parsed.host)) return false;
+    return parsed.pathname === "/playlist" && parsed.searchParams.has("list");
+  } catch {
+    return false;
+  }
+}
+
+/** A link whose title is already known, so nothing needs to be read for it. */
+export function knownLink(url: string, title: string): PendingLink {
+  return { id: crypto.randomUUID(), url, title, failed: false };
 }
 
 /** youtube.com/watch?v=abc -> youtu.be/abc, for a pill that fits. */

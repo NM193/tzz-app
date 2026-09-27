@@ -13,7 +13,7 @@ use crate::services::pdf;
 use crate::services::screen;
 use crate::services::thumb;
 use crate::services::transcript::{self, Screen, Transcript, TranscriptHeader};
-use crate::services::ytdlp::{self, DownloadOptions, ProgressEvent, VideoMeta};
+use crate::services::ytdlp::{self, DownloadOptions, Playlist, ProgressEvent, VideoMeta};
 
 /// Containers ffmpeg handles in practice; whisper never sees them directly.
 const AUDIO_EXTENSIONS: &[&str] = &[
@@ -128,6 +128,13 @@ pub fn check_dependencies() -> Vec<DependencyStatus> {
 pub async fn probe_video(url: String) -> Result<VideoMeta, String> {
     let url = normalize_url(&url)?;
     ytdlp::probe(&url).await
+}
+
+/// What is in a playlist, without fetching any of it.
+#[tauri::command]
+pub async fn probe_playlist(url: String) -> Result<Playlist, String> {
+    let url = normalize_url(&url)?;
+    ytdlp::probe_playlist(&url).await
 }
 
 #[tauri::command]
