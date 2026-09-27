@@ -1,6 +1,15 @@
 # From transcripts to study material
 
-**Status:** direction agreed 2026-08-30. Not yet designed in detail.
+**Status:** superseded 2026-09-27. The app will not build summaries, courses
+or quizzes: NotebookLM does them for free and well enough. What Tzz builds
+instead is the best possible *source* -- a transcript with timestamps,
+chapters, a table of contents and the text that was on screen -- which is more
+than NotebookLM can gather from a YouTube link on its own, since it reads only
+the captions and never sees the picture.
+
+The reasoning below is kept because it still explains why the transcript is
+shaped the way it is. Revisit it only if NotebookLM's limits start to bite, or
+notes are wanted in Serbian, offline, in your own words.
 
 ## What this becomes
 

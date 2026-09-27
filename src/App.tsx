@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { checkDependencies, defaultWhisperModel, type DependencyStatus } from "./lib/api";
+import { checkDependencies, defaultWhisperModel, setGlass, type DependencyStatus } from "./lib/api";
 import { fileItem, pendingLink, type PendingLink } from "./lib/queue";
 import { probeVideo } from "./lib/api";
 import { loadSettings, saveSettings, type Settings } from "./lib/settings";
@@ -12,7 +11,8 @@ import { LibraryView } from "./components/LibraryView";
 import { RecordView } from "./components/RecordView";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar, type View } from "./components/Sidebar";
-import { MoonIcon, SettingsIcon, SunIcon } from "./components/Icons";
+import { LibraryControls } from "./components/LibraryControls";
+import { useLibrary } from "./lib/useLibrary";
 
 export default function App() {
   const [view, setView] = useState<View>("convert");
@@ -23,6 +23,9 @@ export default function App() {
   const [libraryVersion, setLibraryVersion] = useState(0);
 
   const jobs = useJobs(settings);
+  // The results list, shared: the hook measures it for the column re-flow.
+  const resultsRef = useRef<HTMLOListElement>(null);
+  const library = useLibrary(settings, libraryVersion, resultsRef);
   const recorder = useRecorder({
     // A finished recording joins the queue like any dropped file.
     onSaved: (path) => {
@@ -53,12 +56,21 @@ export default function App() {
 
   useEffect(() => saveSettings(settings), [settings]);
 
-  // The frosted material follows the window's appearance, so the theme is
-  // told to the window as well as to the stylesheet.
+  // The glass is a real window material, so the choice goes to macOS as well
+  // as to the stylesheet. Failing to apply it only costs the effect.
   useEffect(() => {
-    document.documentElement.dataset.theme = settings.theme;
-    void getCurrentWindow().setTheme(settings.theme).catch(() => {});
-  }, [settings.theme]);
+    document.documentElement.dataset.surface = settings.surface;
+    void setGlass(settings.surface === "glass").catch(() => {});
+  }, [settings.surface]);
+
+  useEffect(() => {
+    document.documentElement.dataset.accent = settings.accent;
+  }, [settings.accent]);
+
+  useEffect(() => {
+    document.documentElement.dataset.tint = settings.tint;
+    document.documentElement.dataset.aurora = settings.aurora;
+  }, [settings.tint, settings.aurora]);
 
   // Files dropped anywhere on the window start straight away.
   useEffect(() => {
@@ -128,48 +140,31 @@ export default function App() {
 
   return (
     <div className={`app ${dragging ? "app--dragging" : ""}`}>
-      <Sidebar view={view} onNavigate={setView} status={status} />
+      <Sidebar view={view} onNavigate={setView} status={status}>
+        {view === "library" && <LibraryControls library={library} />}
+      </Sidebar>
 
       <main className="stage">
-        <div className="topbar" data-tauri-drag-region>
-          <button
-            type="button"
-            className="icon-button icon-button--round"
-            title="Settings"
-            onClick={() => setView("settings")}
-          >
-            <SettingsIcon size={17} />
-          </button>
-          <button
-            type="button"
-            className="icon-button icon-button--round"
-            title={settings.theme === "dark" ? "Switch to light" : "Switch to dark"}
-            onClick={() => update({ theme: settings.theme === "dark" ? "light" : "dark" })}
-          >
-            {settings.theme === "dark" ? <SunIcon size={17} /> : <MoonIcon size={17} />}
-          </button>
-        </div>
-
-        <div className="stage__scroll">
-          {view === "convert" && (
-            <ConvertView
-              settings={settings}
-              update={update}
-              jobs={jobs}
-              links={links}
-              onAddLinks={addLinks}
-              onRemoveLink={(id) => setLinks((prev) => prev.filter((l) => l.id !== id))}
-              onClearLinks={() => setLinks([])}
-              dragging={dragging}
-              blocked={blocked}
-            />
-          )}
-          {view === "record" && <RecordView recorder={recorder} jobs={jobs} />}
-          {view === "library" && <LibraryView settings={settings} version={libraryVersion} />}
-          {view === "settings" && (
-            <SettingsView settings={settings} update={update} deps={deps} onError={jobs.setError} />
-          )}
-        </div>
+        {view === "convert" && (
+          <ConvertView
+            settings={settings}
+            update={update}
+            jobs={jobs}
+            links={links}
+            onAddLinks={addLinks}
+            onRemoveLink={(id) => setLinks((prev) => prev.filter((l) => l.id !== id))}
+            onClearLinks={() => setLinks([])}
+            dragging={dragging}
+            blocked={blocked}
+          />
+        )}
+        {view === "record" && <RecordView recorder={recorder} jobs={jobs} />}
+        {view === "library" && (
+          <LibraryView settings={settings} library={library} box={resultsRef} />
+        )}
+        {view === "settings" && (
+          <SettingsView settings={settings} update={update} deps={deps} onError={jobs.setError} />
+        )}
       </main>
     </div>
   );

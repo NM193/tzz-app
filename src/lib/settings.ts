@@ -1,6 +1,12 @@
 import type { AudioQuality, TranscriptFormat } from "./api";
 
-export type Theme = "dark" | "light";
+/** The window either shows the desktop through it, or it does not. */
+export type Surface = "solid" | "glass" | "aurora";
+export type Accent = "amber" | "green";
+/** The veil over the blur, on glass. */
+export type Tint = "warm" | "cool" | "ink" | "clear";
+/** The sky the app paints for itself, on aurora. */
+export type Aurora = "dusk" | "ember" | "moss";
 
 export type Settings = {
   outDir: string;
@@ -13,7 +19,10 @@ export type Settings = {
   transcriptFormat: TranscriptFormat;
   combineQueue: boolean;
   readScreen: boolean;
-  theme: Theme;
+  surface: Surface;
+  accent: Accent;
+  tint: Tint;
+  aurora: Aurora;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -27,11 +36,14 @@ export const DEFAULT_SETTINGS: Settings = {
   transcriptFormat: "md",
   combineQueue: true,
   readScreen: false,
-  theme: "dark",
+  surface: "glass",
+  accent: "amber",
+  tint: "warm",
+  aurora: "dusk",
 };
 
 // The key is versioned; a shape change bumps it rather than migrating.
-const STORAGE_KEY = "yt-mp3.settings.v2";
+const STORAGE_KEY = "yt-mp3.settings.v3";
 
 export function loadSettings(): Settings {
   try {

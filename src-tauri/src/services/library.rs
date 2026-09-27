@@ -10,6 +10,8 @@ use std::time::UNIX_EPOCH;
 
 use serde::Serialize;
 
+use super::thumb;
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryEntry {
@@ -19,6 +21,8 @@ pub struct LibraryEntry {
     pub video_path: Option<String>,
     pub markdown_path: Option<String>,
     pub pdf_path: Option<String>,
+    /// `poster.jpg`, when this folder already has one.
+    pub poster_path: Option<String>,
     /// Seconds since the epoch, for sorting newest first.
     pub modified: u64,
 }
@@ -54,6 +58,7 @@ fn describe(folder: &Path) -> Option<LibraryEntry> {
         video_path: None,
         markdown_path: None,
         pdf_path: None,
+        poster_path: thumb::existing(folder).map(|p| p.to_string_lossy().into_owned()),
         modified: modified_at(folder),
     };
 

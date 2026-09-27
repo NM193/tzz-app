@@ -231,11 +231,26 @@ export type LibraryEntry = {
   videoPath: string | null;
   markdownPath: string | null;
   pdfPath: string | null;
+  /** `poster.jpg` in the folder, when it has one. */
+  posterPath: string | null;
   /** Seconds since the epoch. */
   modified: number;
 };
 
+/** Turn the frosted window on or off. */
+export function setGlass(glass: boolean): Promise<void> {
+  return invoke("set_glass", { glass });
+}
+
 /** Every folder in the library, newest first. */
 export function listLibrary(outDir: string | null): Promise<LibraryEntry[]> {
   return invoke("list_library", { outDir });
+}
+
+/**
+ * The folder's picture, drawn now if it has none. Null when the folder holds
+ * nothing that can be pictured.
+ */
+export function ensureThumbnail(path: string): Promise<string | null> {
+  return invoke("ensure_thumbnail", { path });
 }

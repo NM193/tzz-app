@@ -161,6 +161,11 @@ pub async fn download_audio(
         "--audio-quality".into(),
         opts.audio_quality.to_string(),
         "--embed-metadata".into(),
+        // The library shows a picture per folder; this is the best one there
+        // is, and it costs one extra request during a download already running.
+        "--write-thumbnail".into(),
+        "--convert-thumbnails".into(),
+        "jpg".into(),
         // Filename carries the video id so we can find the results deterministically.
         "--output".into(),
         "%(title).120B [%(id)s].%(ext)s".into(),

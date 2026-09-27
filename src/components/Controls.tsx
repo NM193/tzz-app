@@ -17,7 +17,6 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
           type="button"
           role="radio"
           aria-checked={value === option.value}
-          className={`segmented__item ${value === option.value ? "segmented__item--on" : ""}`}
           onClick={() => onChange(option.value)}
         >
           {option.label}
@@ -27,42 +26,76 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
   );
 }
 
-type SwitchProps = {
+export function Switch({
+  checked,
+  onChange,
+  label,
+}: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
-};
-
-export function Switch({ checked, onChange, label }: SwitchProps) {
+}) {
   return (
     <button
       type="button"
       role="switch"
+      className="switch"
       aria-checked={checked}
       aria-label={label}
-      className={`switch ${checked ? "switch--on" : ""}`}
       onClick={() => onChange(!checked)}
     >
-      <span className="switch__knob" />
+      <i />
     </button>
   );
 }
 
-type RowProps = {
+/** A settings line: what it is on the left, the control on the right. */
+export function Setting({
+  title,
+  hint,
+  children,
+}: {
   title: string;
   hint?: ReactNode;
   children: ReactNode;
-};
-
-/** A settings line: what it is on the left, the control on the right. */
-export function Row({ title, hint, children }: RowProps) {
+}) {
   return (
-    <div className="row">
-      <div className="row__text">
-        <span className="row__title">{title}</span>
-        {hint && <span className="row__hint">{hint}</span>}
+    <div className="setting">
+      <div className="setting__text">
+        <b>{title}</b>
+        {hint && <span>{hint}</span>}
       </div>
-      <div className="row__control">{children}</div>
+      <div className="setting__control">{children}</div>
     </div>
+  );
+}
+
+/** One line of the tick lists that replaced the option menus. */
+export function Check({
+  on,
+  onToggle,
+  label,
+  hint,
+  disabled,
+}: {
+  on: boolean;
+  onToggle: () => void;
+  label: string;
+  hint?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      data-on={on ? "" : undefined}
+      disabled={disabled}
+      onClick={onToggle}
+    >
+      <i className="tick" />
+      {label}
+      {hint && <em>{hint}</em>}
+    </button>
   );
 }

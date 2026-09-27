@@ -31,7 +31,9 @@ macOS ties permissions and settings to it.
   - `binaries` finding external tools · `ytdlp` downloading · `transcript`
     parsing and formatting · `screen` reading text off video · `pdf` ·
     `combine` stitching a queue into one document · `recorder` ·
-    `audio_output` CoreAudio · `tray` the menu bar icon
+    `audio_output` CoreAudio · `tray` the menu bar icon · `cancel` stopping a
+    job and deleting what it wrote · `library` reading the output folder ·
+    `thumb` one picture per folder · `glass` the frosted window
 - `src-tauri/helpers/ocr.swift` the Vision text reader.
 
 ## Key patterns
@@ -47,6 +49,27 @@ macOS ties permissions and settings to it.
 - User-facing error strings are plain sentences, not debug output.
 - Captions and Whisper both produce SRT so there is exactly one formatting
   path. Do not add a second one that skips the timings.
+
+## Design
+The look is documented in `docs/design-reference-work.md`, extracted from
+another project of the owner's. Two rules carry it:
+
+- **One accent, three greys, hairlines.** Every colour lives at the top of
+  `src/styles.css` and nowhere else. `--muted` is for large text only.
+- **Two faces, hard split.** The serif is for headings only; the sans is the
+  interface; mono is for data and labels. **Anything clickable is sans and
+  brighter; anything you only read is mono, uppercase and dim.** That is how a
+  row's status never gets mistaken for one of its buttons.
+
+Motion is one gesture repeated: a wipe from below. Cards open bottom to top,
+rules draw from the left. Script-driven animation checks
+`prefers-reduced-motion` itself -- the global CSS rule does not reach it.
+
+Settings chooses the window's surface (solid, glass, or an aurora the app
+paints itself), its tint, and the accent. There is no light theme: this palette
+has no light version, and one would be a different design.
+
+Prototypes live in `.superpowers/prototype/` and open with a double click.
 
 ## Lessons the code encodes
 These were bugs. The comments in the code say the same; this is the index.
@@ -67,6 +90,11 @@ These were bugs. The comments in the code say the same; this is the index.
 - **`--no-part` plus an existing file is a trap.** yt-dlp treats a finished
   download as an interrupted one and fails resuming past its end (HTTP 416).
   Check for the file first.
+- **Every folder can show a picture, one way or another.** `thumb.rs` tries the
+  cover yt-dlp wrote, then a frame from 30 seconds in (not the first second --
+  that is a title card), then the waveform of the audio, then the cover fetched
+  from YouTube using the id in the folder's own name. It is cached as
+  `poster.jpg` and never recomputed.
 
 ## Working on this
 - **Do not edit Rust while a job is running.** The dev watcher restarts the app
@@ -84,15 +112,25 @@ the folder (or `git clone`), then `brew install yt-dlp ffmpeg whisper-cpp`,
 drop a Whisper `ggml-*.bin` model where Settings can find it, and run
 `npm run install:app`.
 
+## What this is for
+The point is not to answer questions about a lecture -- **NotebookLM does that
+for free**, and the owner uses it. The point is to hand it a better source than
+it can gather itself: given a YouTube link it reads only the captions and never
+sees the picture, while this app's markdown carries timestamps, chapters, a
+table of contents and the text that was on screen.
+
+So effort goes into the quality of the document, not into a model. Summaries,
+courses and quizzes are **deliberately not built** (see the spec above).
+
 ## Current status
 Working: single video and queue, MP3, transcript from captions or Whisper,
 screen text via OCR, chapters and a table of contents, markdown and PDF, one
 combined document per queue, local audio and video files, audio recording with
 a menu bar icon and level meter, automatic output-device switching, stopping a
-job mid-run, a Library screen listing the output folder.
+job mid-run, a Library that searches and filters what is on disk, a picture per
+folder.
 
-Not built: summaries, courses and quizzes (see
-`docs/superpowers/specs/2026-08-30-study-material-vision.md`), playlists,
+Not built: a reader inside the app, a notification when a job ends, playlists,
 Windows support.
 
 ## Commands
@@ -100,4 +138,4 @@ Windows support.
 - `npm run build` -- bundle a .app / .dmg
 - `npm run install:app` -- build and replace the copy in /Applications
 - `npm run build:vite` -- typecheck the frontend only
-- `cd src-tauri && cargo test` -- 63 tests, all pure logic
+- `cd src-tauri && cargo test` -- 69 tests, all pure logic

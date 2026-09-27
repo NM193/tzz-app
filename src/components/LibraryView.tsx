@@ -1,106 +1,179 @@
-import { useEffect, useState } from "react";
-import { errorMessage, listLibrary, openOutputFolder, revealInFileManager, type LibraryEntry } from "../lib/api";
+import { useCallback, useMemo, type RefObject } from "react";
+import { revealInFileManager, type LibraryEntry } from "../lib/api";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { kindsOf } from "../lib/library";
+import { cardEnter, cardExit, rowEnter, rowExit } from "../lib/motion";
 import { libraryLabel, type Settings } from "../lib/settings";
-import { Hero } from "./Hero";
-import { DocIcon, FolderIcon, MusicIcon, VideoIcon } from "./Icons";
+import { useListTransitions } from "../lib/useList";
+import type { Library } from "../lib/useLibrary";
+import { CountRoll } from "./CountRoll";
+import { DocIcon, MusicIcon, VideoIcon } from "./Icons";
+import { Lede } from "./Lede";
+import { Marked } from "./Marked";
 
 type Props = {
   settings: Settings;
-  /** Bumped when a job finishes, so the list is never stale. */
-  version: number;
+  library: Library;
+  box: RefObject<HTMLOListElement>;
 };
 
 function when(seconds: number): string {
-  const date = new Date(seconds * 1000);
-  return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return new Date(seconds * 1000).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
-export function LibraryView({ settings, version }: Props) {
-  const [entries, setEntries] = useState<LibraryEntry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+/** Only the results. The controls live in the sidebar. */
+export function LibraryView({ settings, library, box }: Props) {
+  const { entries, error, matching, query, layout, cols, rows } = library;
 
-  useEffect(() => {
-    listLibrary(settings.outDir || null)
-      .then(setEntries)
-      .catch((caught) => setError(errorMessage(caught)));
-  }, [settings.outDir, version]);
+  const byPath = useMemo(
+    () => new Map(matching.map((entry) => [entry.path, entry])),
+    [matching],
+  );
+
+  const enter = useCallback(
+    (el: HTMLElement, index: number) => (layout === "grid" ? cardEnter : rowEnter)(el, index),
+    [layout],
+  );
+  const exit = useCallback(
+    (el: HTMLElement) => (layout === "grid" ? cardExit : rowExit)(el),
+    [layout],
+  );
+
+  const paths = useListTransitions(
+    box,
+    useMemo(() => matching.map((entry) => entry.path), [matching]),
+    enter,
+    exit,
+    layout,
+  );
+  const shown = useMemo(
+    () => paths.map((path) => byPath.get(path)).filter((e): e is LibraryEntry => !!e),
+    [paths, byPath],
+  );
+
+  const resting = `Everything you have turned into notes, in ${libraryLabel(settings.outDir)}.`;
+  const lede = query
+    ? matching.length > 0
+      ? `Everything you have turned into notes, matching “${query}”.`
+      : `Nothing here matches “${query}” yet.`
+    : resting;
+  const ledeHeights = useMemo(() => [resting], [resting]);
 
   return (
     <>
-      <Hero
-        kicker="Library"
-        title={
-          <>
-            Everything <span className="accent">so far</span>
-          </>
-        }
-        lead={`One folder per video, in ${libraryLabel(settings.outDir)}.`}
-      />
+      <h1 className="title">
+        Library <em>(<CountRoll value={matching.length} />)</em>
+      </h1>
+      <Lede text={lede} measure={ledeHeights} />
 
-      <section className="glass">
-        <div className="section-head">
-          <h2 className="section-title">
-            {entries === null ? "Reading" : `${entries.length} ${entries.length === 1 ? "folder" : "folders"}`}
-          </h2>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => openOutputFolder(settings.outDir || null).catch((c) => setError(errorMessage(c)))}
-          >
-            <FolderIcon size={16} />
-            Show in Finder
-          </button>
-        </div>
+      {error && <p className="notice notice--loud">{error}</p>}
 
-        {error && <p className="notice notice--error">{error}</p>}
+      {entries !== null && matching.length === 0 && (
+        <p className="empty">
+          {library.all.length === 0
+            ? "Nothing here yet. Convert a lecture and it will show up."
+            : "Nothing matches that."}
+        </p>
+      )}
 
-        {entries && entries.length === 0 && (
-          <p className="empty">Nothing here yet. Convert a video and it will show up.</p>
-        )}
-
-        {entries && entries.length > 0 && (
-          <ul className="cards">
-            {entries.map((entry) => (
-              <li key={entry.path} className="card">
-                <span className="card__icon">
-                  {entry.videoPath ? <VideoIcon /> : entry.audioPath ? <MusicIcon /> : <DocIcon />}
+      {layout === "grid" ? (
+        <ol className="grid" data-cols={cols} ref={box}>
+          {shown.map((entry) => (
+            <li key={entry.path} data-id={entry.path} className="card">
+              <button
+                type="button"
+                className="card__cover"
+                data-cover
+                title={entry.path}
+                onClick={() => revealInFileManager(entry.path)}
+              >
+                {entry.posterPath ? (
+                  <img src={convertFileSrc(entry.posterPath)} alt="" loading="lazy" />
+                ) : (
+                  <span>
+                    {entry.videoPath ? (
+                      <VideoIcon size={22} />
+                    ) : entry.audioPath ? (
+                      <MusicIcon size={22} />
+                    ) : (
+                      <DocIcon size={22} />
+                    )}
+                  </span>
+                )}
+              </button>
+              <span className="card__row" data-text>
+                <span className="card__title">
+                  <Marked text={entry.name} query={query} />
                 </span>
-                <div className="card__body">
-                  <span className="card__title">{entry.name}</span>
-                  <span className="card__meta">{when(entry.modified)}</span>
-                </div>
-                <div className="card__actions">
-                  <button type="button" className="icon-button" title="Show folder" onClick={() => revealInFileManager(entry.path)}>
-                    <FolderIcon size={16} />
+                <span className="card__meta">{when(entry.modified)}</span>
+              </span>
+              <span className="tags" data-text>
+                {kindsOf(entry).map((kind) => (
+                  <span key={kind} className="tag">
+                    {kind}
+                  </span>
+                ))}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <ol className="list" data-rows={rows} ref={box}>
+          {shown.map((entry, index) => (
+            <li key={entry.path} data-id={entry.path} className="row">
+              <div className="row__in">
+                <span className="row__n" data-part>
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <span className="row__title" data-part>
+                  <Marked text={entry.name} query={query} />
+                </span>
+                <span className="row__meta" data-part>
+                  {when(entry.modified)}
+                </span>
+                <span className="tags" data-part>
+                  {kindsOf(entry).map((kind) => (
+                    <span key={kind} className="tag">
+                      {kind}
+                    </span>
+                  ))}
+                </span>
+                <span className="row__files" data-part>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={() => revealInFileManager(entry.path)}
+                  >
+                    Folder
                   </button>
-                  {entry.audioPath && (
-                    <button type="button" className="icon-button" title="Show MP3" onClick={() => revealInFileManager(entry.audioPath!)}>
-                      <MusicIcon size={16} />
-                    </button>
-                  )}
-                  {entry.videoPath && (
-                    <button type="button" className="icon-button" title="Show video" onClick={() => revealInFileManager(entry.videoPath!)}>
-                      <VideoIcon size={16} />
-                    </button>
-                  )}
                   {entry.markdownPath && (
-                    <button type="button" className="icon-button" onClick={() => revealInFileManager(entry.markdownPath!)}>
-                      <DocIcon size={16} />
-                      <span>MD</span>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => revealInFileManager(entry.markdownPath!)}
+                    >
+                      MD
                     </button>
                   )}
                   {entry.pdfPath && (
-                    <button type="button" className="icon-button" onClick={() => revealInFileManager(entry.pdfPath!)}>
-                      <DocIcon size={16} />
-                      <span>PDF</span>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => revealInFileManager(entry.pdfPath!)}
+                    >
+                      PDF
                     </button>
                   )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                </span>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
     </>
   );
 }

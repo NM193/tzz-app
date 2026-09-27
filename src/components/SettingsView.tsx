@@ -1,14 +1,24 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { errorMessage, openOutputFolder, type AudioQuality, type DependencyStatus, type TranscriptFormat } from "../lib/api";
-import type { Settings, Theme } from "../lib/settings";
-import { Row, Segmented, Switch } from "./Controls";
-import { Hero } from "./Hero";
+import {
+  errorMessage,
+  openOutputFolder,
+  type AudioQuality,
+  type DependencyStatus,
+} from "../lib/api";
+import type { Accent, Aurora, Settings, Surface, Tint } from "../lib/settings";
+import { Segmented, Setting, Switch } from "./Controls";
 
 type Props = {
   settings: Settings;
   update: (patch: Partial<Settings>) => void;
   deps: DependencyStatus[];
   onError: (message: string) => void;
+};
+
+const BREW: Record<string, string> = {
+  "yt-dlp": "yt-dlp",
+  ffmpeg: "ffmpeg",
+  "whisper-cli": "whisper-cpp",
 };
 
 export function SettingsView({ settings, update, deps, onError }: Props) {
@@ -25,37 +35,101 @@ export function SettingsView({ settings, update, deps, onError }: Props) {
     if (typeof picked === "string") update({ whisperModelPath: picked });
   }
 
-  const firstLang = settings.transcriptLangs[0] ?? "sr";
-
   return (
     <>
-      <Hero
-        kicker="Settings"
-        title={
-          <>
-            Set once, <span className="accent">forget</span>
-          </>
-        }
-        lead="Where things go and how they are made. The Convert screen keeps the choices you change every day."
-      />
+      <h1 className="title">Settings</h1>
+      <p className="lede">
+        Set once, forget. What changes every day lives on the Convert screen instead.
+      </p>
 
-      <section className="glass">
-        <h2 className="section-title">Files</h2>
+      <div className="section">
+        <h2>Appearance</h2>
 
-        <Row title="Save to" hint={settings.outDir || "~/Documents/Tzz Library"}>
+        <Setting
+          title="Window"
+          hint="Glass shows your desktop through the window. Aurora paints its own sky, so it looks the same whatever your wallpaper is. Solid is plain and the easiest to read."
+        >
+          <Segmented<Surface>
+            label="Window"
+            value={settings.surface}
+            onChange={(surface) => update({ surface })}
+            options={[
+              { value: "solid", label: "Solid" },
+              { value: "glass", label: "Glass" },
+              { value: "aurora", label: "Aurora" },
+            ]}
+          />
+        </Setting>
+
+        {settings.surface === "aurora" && (
+          <Setting title="Sky" hint="Which colours the app paints behind everything.">
+            <Segmented<Aurora>
+              label="Sky"
+              value={settings.aurora}
+              onChange={(aurora) => update({ aurora })}
+              options={[
+                { value: "dusk", label: "Dusk" },
+                { value: "ember", label: "Ember" },
+                { value: "moss", label: "Moss" },
+              ]}
+            />
+          </Setting>
+        )}
+
+        {settings.surface !== "solid" && (
+          <Setting
+            title="Tint"
+            hint="How much of what is behind comes through. Clear shows the most."
+          >
+            <Segmented<Tint>
+              label="Tint"
+              value={settings.tint}
+              onChange={(tint) => update({ tint })}
+              options={[
+                { value: "warm", label: "Warm" },
+                { value: "cool", label: "Cool" },
+                { value: "ink", label: "Ink" },
+                { value: "clear", label: "Clear" },
+              ]}
+            />
+          </Setting>
+        )}
+
+        <Setting title="Accent" hint="The one colour the app uses for anything live.">
+          <Segmented<Accent>
+            label="Accent"
+            value={settings.accent}
+            onChange={(accent) => update({ accent })}
+            options={[
+              { value: "amber", label: "Amber" },
+              { value: "green", label: "Green" },
+            ]}
+          />
+        </Setting>
+      </div>
+
+      <div className="section">
+        <h2>Files</h2>
+
+        <Setting title="Save to" hint={settings.outDir || "~/Documents/Tzz Library"}>
           <button
             type="button"
-            className="ghost-button"
-            onClick={() => openOutputFolder(settings.outDir || null).catch((c) => onError(errorMessage(c)))}
+            className="ghost ghost--small"
+            onClick={() =>
+              openOutputFolder(settings.outDir || null).catch((c) => onError(errorMessage(c)))
+            }
           >
             Show
           </button>
-          <button type="button" className="ghost-button" onClick={pickFolder}>
+          <button type="button" className="ghost ghost--small" onClick={pickFolder}>
             Change
           </button>
-        </Row>
+        </Setting>
 
-        <Row title="Audio quality" hint="VBR V0 is smaller and sounds the same; 320 is a fixed bitrate.">
+        <Setting
+          title="Audio quality"
+          hint="VBR V0 is smaller and sounds the same; 320 is a fixed bitrate."
+        >
           <Segmented<AudioQuality>
             label="Audio quality"
             value={settings.audioQuality}
@@ -65,40 +139,30 @@ export function SettingsView({ settings, update, deps, onError }: Props) {
               { value: "320", label: "320 kbps" },
             ]}
           />
-        </Row>
+        </Setting>
 
-        <Row title="Transcript format">
-          <Segmented<TranscriptFormat>
-            label="Transcript format"
-            value={settings.transcriptFormat}
-            onChange={(transcriptFormat) => update({ transcriptFormat })}
-            options={[
-              { value: "md", label: "Markdown" },
-              { value: "pdf", label: "PDF" },
-              { value: "both", label: "Both" },
-            ]}
-          />
-        </Row>
-
-        <Row title="Combine a queue into one document" hint="Each video keeps its own file as well.">
+        <Setting
+          title="Combine a queue into one document"
+          hint="Each lecture keeps its own file as well."
+        >
           <Switch
             label="Combine a queue into one document"
             checked={settings.combineQueue}
             onChange={(combineQueue) => update({ combineQueue })}
           />
-        </Row>
-      </section>
+        </Setting>
+      </div>
 
-      <section className="glass">
-        <h2 className="section-title">Transcription</h2>
+      <div className="section">
+        <h2>Transcription</h2>
 
-        <Row
+        <Setting
           title="Caption language to try first"
           hint="The original track always wins over a machine translation."
         >
           <Segmented<string>
             label="Caption language"
-            value={firstLang}
+            value={settings.transcriptLangs[0] ?? "sr"}
             onChange={(lang) =>
               update({ transcriptLangs: lang === "sr" ? ["sr", "en"] : ["en", "sr"] })
             }
@@ -107,47 +171,35 @@ export function SettingsView({ settings, update, deps, onError }: Props) {
               { value: "en", label: "English" },
             ]}
           />
-        </Row>
+        </Setting>
 
-        <Row
+        <Setting
           title="Whisper model"
-          hint={settings.whisperModelPath || "Not set. Videos without captions get no transcript."}
+          hint={
+            settings.whisperModelPath ||
+            "Not set. Lectures without captions get no transcript."
+          }
         >
-          <button type="button" className="ghost-button" onClick={pickModel}>
+          <button type="button" className="ghost ghost--small" onClick={pickModel}>
             Choose
           </button>
-        </Row>
-      </section>
+        </Setting>
+      </div>
 
-      <section className="glass">
-        <h2 className="section-title">Appearance</h2>
-        <Row title="Theme">
-          <Segmented<Theme>
-            label="Theme"
-            value={settings.theme}
-            onChange={(theme) => update({ theme })}
-            options={[
-              { value: "dark", label: "Dark" },
-              { value: "light", label: "Light" },
-            ]}
-          />
-        </Row>
-      </section>
-
-      <section className="glass">
-        <h2 className="section-title">Tools</h2>
+      <div className="section">
+        <h2>Tools</h2>
         {deps.map((dep) => (
-          <Row
+          <Setting
             key={dep.name}
             title={dep.name}
-            hint={dep.found ? dep.path : `Not found. Install with brew install ${dep.name === "whisper-cli" ? "whisper-cpp" : dep.name}`}
+            hint={dep.found ? dep.path : `Install with: brew install ${BREW[dep.name] ?? dep.name}`}
           >
-            <span className={`pill-status ${dep.found ? "pill-status--ok" : "pill-status--missing"}`}>
-              {dep.found ? "Installed" : "Missing"}
+            <span className={`state ${dep.found ? "state--ok" : ""}`}>
+              {dep.found ? "Ready" : "Missing"}
             </span>
-          </Row>
+          </Setting>
         ))}
-      </section>
+      </div>
     </>
   );
 }

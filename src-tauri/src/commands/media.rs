@@ -11,6 +11,7 @@ use crate::services::cancel;
 use crate::services::combine::{self, Section};
 use crate::services::pdf;
 use crate::services::screen;
+use crate::services::thumb;
 use crate::services::transcript::{self, Screen, Transcript, TranscriptHeader};
 use crate::services::ytdlp::{self, DownloadOptions, ProgressEvent, VideoMeta};
 
@@ -225,6 +226,9 @@ async fn run_job_inner(app: &AppHandle, request: JobRequest) -> Result<JobResult
         }
     }
 
+    // Whatever this job kept, the library gets a picture of it.
+    thumb::ensure(&job_dir);
+
     ytdlp::emit(&app, ProgressEvent::stage("done", None));
 
     Ok(JobResult {
@@ -395,6 +399,10 @@ async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Re
         &screens,
         &[],
     )?;
+
+    if let Some(folder) = path.parent() {
+        thumb::ensure(folder);
+    }
 
     ytdlp::emit(&app, ProgressEvent::stage("done", None));
 

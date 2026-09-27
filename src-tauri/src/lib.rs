@@ -9,7 +9,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             services::tray::build(app.handle())?;
-            services::glass::apply(app.handle());
+            // The frontend turns the glass on if that is what was saved.
+            services::glass::apply(app.handle(), false);
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -30,6 +31,8 @@ pub fn run() {
             commands::media::reveal_in_file_manager,
             commands::media::open_output_folder,
             commands::library::list_library,
+            commands::library::ensure_thumbnail,
+            commands::window::set_glass,
             commands::recording::list_audio_inputs,
             commands::recording::set_audio_input,
             commands::recording::toggle_recording,

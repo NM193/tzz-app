@@ -7,6 +7,7 @@ pub mod library;
 pub mod pdf;
 pub mod recorder;
 pub mod screen;
+pub mod thumb;
 pub mod tray;
 pub mod transcript;
 pub mod ytdlp;

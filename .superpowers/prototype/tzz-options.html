@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tzz App — what to keep, five ways</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/*
+  Five ways to choose what a job keeps. Same state, same words, same tokens --
+  only the control changes. Switch at the bottom of the window.
+*/
+:root{
+  --bg:#181616; --card:#100e0e; --bone:#fffddc; --muted:#7a726c; --muted-2:#bdb5ac;
+  --caption:#8a827b; --line:#2a2626; --line-2:#3a3533; --accent:#f7ab29;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --serif:'Instrument Serif',Georgia,serif;
+  --sans:'Geist',system-ui,sans-serif;
+  --mono:'Geist Mono',ui-monospace,monospace;
+}
+body[data-accent="green"]{--accent:#8ddb6a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--bone);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased;user-select:none}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+:focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+
+.page{max-width:56rem;margin:0 auto;padding:3rem 2.5rem 9rem}
+h1{margin:0;font:400 3rem/.95 var(--serif);letter-spacing:-.03em}
+.lede{margin:.875rem 0 2rem;max-width:34rem;font-size:.875rem;line-height:1.55;color:var(--muted-2)}
+.eyebrow{display:block;font:500 .625rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--caption)}
+
+.stage{padding-top:1.25rem;border-top:1px solid var(--line)}
+.variant{display:none}
+.variant[data-on]{display:block}
+
+.bar{display:flex;align-items:center;justify-content:space-between;gap:1.5rem;margin-top:2rem;padding-top:1.25rem;border-top:1px solid var(--line)}
+.bar span{font-size:.8125rem;color:var(--muted-2)}
+.cta{padding:.75rem 1.25rem;border:1px solid var(--bone);border-radius:.5rem;background:var(--bone);color:var(--bg);font:500 .875rem var(--sans);transition:background .2s,color .2s}
+.cta:hover{background:transparent;color:var(--bone)}
+.cta:disabled{opacity:.35;cursor:default}
+
+/* ============ A · ticks (what is in the app now) ============ */
+.a-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2rem}
+.a-list{display:grid;gap:.125rem;margin-top:.625rem}
+.a-list button{display:flex;align-items:center;gap:.625rem;padding:.375rem .5rem;margin-left:-.5rem;border-radius:.375rem;color:var(--muted-2);font:400 .875rem var(--sans);text-align:left;transition:color .25s}
+.a-list button:hover{color:var(--bone)}
+.a-list button[data-on]{color:var(--bone)}
+.a-tick{position:relative;flex:none;width:1rem;height:1rem;border:1px solid var(--line-2);border-radius:.25rem;transition:background .2s,border-color .2s}
+[data-on]>.a-tick{background:var(--accent);border-color:var(--accent)}
+.a-tick::after{content:'';position:absolute;left:.25rem;top:.0625rem;width:.25rem;height:.5rem;border:solid var(--bg);border-width:0 1.5px 1.5px 0;transform:rotate(45deg) scale(0);transition:transform .25s var(--ease)}
+[data-on]>.a-tick::after{transform:rotate(45deg) scale(1)}
+.a-list em{font-style:normal;font-size:.75rem;color:var(--caption)}
+
+/* ============ B · chips ============ */
+.b-group{margin-bottom:1.5rem}
+.b-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.625rem}
+.chip{display:inline-flex;align-items:center;gap:.5rem;height:2.25rem;padding:0 .875rem;border:1px solid var(--line-2);border-radius:999px;color:var(--muted-2);font:500 .8125rem var(--sans);transition:color .25s,border-color .25s,background .25s}
+.chip:hover{color:var(--bone);border-color:var(--muted)}
+.chip[data-on]{background:var(--bone);border-color:var(--bone);color:var(--bg)}
+.chip em{font-style:normal;font-size:.6875rem;color:var(--caption)}
+.chip[data-on] em{color:#6b645e}
+
+/* ============ C · one compact line ============ */
+.c-line{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1.25rem}
+.c-set{display:flex;align-items:center;gap:.625rem}
+.c-set > .eyebrow{white-space:nowrap}
+.seg{display:inline-flex;padding:.1875rem;border:1px solid var(--line-2);border-radius:.5rem}
+.seg button{padding:.375rem .75rem;border-radius:.375rem;color:var(--muted-2);font:500 .8125rem var(--sans);transition:background .25s,color .25s}
+.seg button:hover{color:var(--bone)}
+.seg button[data-on]{background:var(--bone);color:var(--bg)}
+.c-folder{display:inline-flex;align-items:center;gap:.5rem;padding:.4375rem .75rem;border:1px solid var(--line-2);border-radius:.5rem;color:var(--muted-2);font:500 .8125rem var(--sans)}
+.c-folder:hover{color:var(--bone);border-color:var(--muted)}
+
+/* ============ D · a sentence you can edit ============ */
+.d-sentence{max-width:44rem;font:400 1.75rem/1.55 var(--serif);letter-spacing:-.01em;color:var(--muted)}
+.d-sentence button{
+  font:inherit;color:var(--muted);padding:0 .1em;border-radius:.2em;
+  background-image:linear-gradient(currentColor,currentColor);
+  background-size:100% 1px;background-repeat:no-repeat;background-position:0 92%;
+  transition:color .25s,background-size .35s,opacity .25s;
+}
+.d-sentence button:hover{color:var(--bone)}
+.d-sentence button[data-on]{color:var(--bone);background-size:0 1px;background-position:100% 92%}
+.d-sentence button:not([data-on]){opacity:.5}
+.d-sentence .d-fixed{color:var(--muted)}
+.d-note{margin-top:1.25rem;font-size:.8125rem;color:var(--caption)}
+
+/* ============ E · three panels ============ */
+.e-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}
+.e-card{display:flex;flex-direction:column;gap:.5rem;padding:1.125rem 1.125rem 1rem;border:1px solid var(--line-2);border-radius:.625rem;text-align:left;transition:border-color .25s,background .25s}
+.e-card:hover{border-color:var(--muted)}
+.e-card[data-on]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.e-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.e-name{font:500 .9375rem var(--sans)}
+.e-state{font:500 .625rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--caption)}
+.e-card[data-on] .e-state{color:var(--accent)}
+.e-desc{font-size:.75rem;line-height:1.45;color:var(--caption)}
+.e-sub{display:flex;gap:.375rem;margin-top:.25rem}
+.e-sub button{padding:.25rem .5rem;border:1px solid var(--line-2);border-radius:.3125rem;font:500 .6875rem var(--mono);letter-spacing:.06em;color:var(--caption);transition:color .2s,border-color .2s,background .2s}
+.e-sub button:hover{color:var(--bone)}
+.e-sub button[data-on]{background:var(--bone);border-color:var(--bone);color:var(--bg)}
+
+/* ============ switches ============ */
+.proto{position:fixed;z-index:60;left:0;right:0;bottom:1rem;width:fit-content;max-width:calc(100% - 2rem);margin:0 auto;display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem .875rem;align-items:center;padding:.5rem .625rem;border-radius:1.125rem;background:rgb(14 13 13/.92);border:1px solid var(--line-2);backdrop-filter:blur(12px)}
+.grp{display:flex;gap:.1875rem;align-items:center}
+.grp>span{font:500 .625rem var(--mono);letter-spacing:.14em;color:var(--caption);padding:0 .375rem 0 .25rem;text-transform:uppercase}
+.proto button{font:500 .6875rem var(--mono);letter-spacing:.06em;color:var(--muted-2);border-radius:999px;padding:.4375rem .625rem;white-space:nowrap}
+.proto button.on{background:var(--bone);color:var(--bg)}
+</style>
+</head>
+<body data-accent="amber">
+
+<div class="page">
+  <h1>Convert</h1>
+  <p class="lede">The same choice, five ways. Everything below is live: toggle it and watch the button at the bottom.</p>
+
+  <div class="stage">
+
+    <!-- ============ A · ticks ============ -->
+    <section class="variant" data-v="a">
+      <div class="a-grid">
+        <div>
+          <span class="eyebrow">Keep</span>
+          <div class="a-list">
+            <button data-t="audio"><i class="a-tick"></i>Audio <em>MP3</em></button>
+            <button data-t="video"><i class="a-tick"></i>Video file <em>~1 GB an hour</em></button>
+            <button data-t="text"><i class="a-tick"></i>Transcript</button>
+          </div>
+        </div>
+        <div>
+          <span class="eyebrow">Transcript</span>
+          <div class="a-list">
+            <button data-t="md"><i class="a-tick"></i>Markdown</button>
+            <button data-t="pdf"><i class="a-tick"></i>PDF</button>
+            <button data-t="screen"><i class="a-tick"></i>Read the screen <em>slower</em></button>
+          </div>
+        </div>
+        <div>
+          <span class="eyebrow">Save to</span>
+          <div class="a-list">
+            <button data-on><i class="a-tick"></i>Tzz Library</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ B · chips ============ -->
+    <section class="variant" data-v="b">
+      <div class="b-group">
+        <span class="eyebrow">Keep</span>
+        <div class="b-row">
+          <button class="chip" data-t="audio">Audio <em>MP3</em></button>
+          <button class="chip" data-t="video">Video file <em>~1 GB / h</em></button>
+          <button class="chip" data-t="text">Transcript</button>
+        </div>
+      </div>
+      <div class="b-group">
+        <span class="eyebrow">Transcript</span>
+        <div class="b-row">
+          <button class="chip" data-t="md">Markdown</button>
+          <button class="chip" data-t="pdf">PDF</button>
+          <button class="chip" data-t="screen">Read the screen <em>slower</em></button>
+        </div>
+      </div>
+      <div class="b-group">
+        <span class="eyebrow">Save to</span>
+        <div class="b-row">
+          <button class="chip" data-on>Tzz Library</button>
+          <button class="chip">Choose another folder…</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ C · one line ============ -->
+    <section class="variant" data-v="c">
+      <div class="c-line">
+        <span class="c-set">
+          <span class="eyebrow">Keep</span>
+          <span class="seg">
+            <button data-t="audio">Audio</button>
+            <button data-t="video">Video</button>
+            <button data-t="text">Transcript</button>
+          </span>
+        </span>
+        <span class="c-set">
+          <span class="eyebrow">As</span>
+          <span class="seg">
+            <button data-t="md">MD</button>
+            <button data-t="pdf">PDF</button>
+            <button data-t="screen">+ Screen</button>
+          </span>
+        </span>
+        <span class="c-set">
+          <span class="eyebrow">Into</span>
+          <button class="c-folder">Tzz Library</button>
+        </span>
+      </div>
+    </section>
+
+    <!-- ============ D · an editable sentence ============ -->
+    <section class="variant" data-v="d">
+      <p class="d-sentence">
+        <span class="d-fixed">Keep the</span>
+        <button data-t="audio">audio</button><span class="d-fixed">,</span>
+        <button data-t="video">video</button>
+        <span class="d-fixed">and a</span>
+        <button data-t="text">transcript</button>
+        <span class="d-fixed">as</span>
+        <button data-t="md">Markdown</button>
+        <span class="d-fixed">and</span>
+        <button data-t="pdf">PDF</button><span class="d-fixed">,</span>
+        <button data-t="screen">reading the screen</button><span class="d-fixed">.</span>
+        <br />
+        <span class="d-fixed">Save it in</span>
+        <button data-on>Tzz Library</button><span class="d-fixed">.</span>
+      </p>
+      <p class="d-note">Struck-through words are switched off. Click a word to bring it back.</p>
+    </section>
+
+    <!-- ============ E · three panels ============ -->
+    <section class="variant" data-v="e">
+      <div class="e-grid">
+        <button class="e-card" data-t="audio">
+          <span class="e-head"><span class="e-name">Audio</span><span class="e-state">off</span></span>
+          <span class="e-desc">One MP3 of the whole lecture. Small, and what you listen to again.</span>
+        </button>
+
+        <button class="e-card" data-t="video" style="cursor:pointer">
+          <span class="e-head"><span class="e-name">Video file</span><span class="e-state">off</span></span>
+          <span class="e-desc">The picture as well. About a gigabyte an hour.</span>
+        </button>
+
+        <div class="e-card" data-card="text">
+          <span class="e-head"><span class="e-name">Transcript</span><span class="e-state">off</span></span>
+          <span class="e-desc">Timestamped text, with chapters and a table of contents.</span>
+          <span class="e-sub">
+            <button data-t="md">MD</button>
+            <button data-t="pdf">PDF</button>
+            <button data-t="screen">Screen</button>
+          </span>
+        </div>
+      </div>
+      <p class="d-note" style="margin-top:1rem">The third panel turns on when you pick a format.</p>
+    </section>
+
+  </div>
+
+  <div class="bar">
+    <span id="summary">Nothing selected</span>
+    <button class="cta" id="go">Convert</button>
+  </div>
+</div>
+
+<div class="proto">
+  <span class="grp"><span>Option UI</span>
+    <button data-set="v" data-val="a" class="on">a · ticks</button>
+    <button data-set="v" data-val="b">b · chips</button>
+    <button data-set="v" data-val="c">c · one line</button>
+    <button data-set="v" data-val="d">d · sentence</button>
+    <button data-set="v" data-val="e">e · panels</button>
+  </span>
+  <span class="grp"><span>Accent</span>
+    <button data-set="accent" data-val="amber" class="on">amber</button>
+    <button data-set="accent" data-val="green">green</button>
+  </span>
+</div>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+
+/* One state, shared by every variant, so switching keeps your choices. */
+const state = { audio:true, video:false, text:true, md:true, pdf:false, screen:false };
+
+function paint(){
+  // every control that names a key follows the state
+  $$('[data-t]').forEach(el=>{
+    const on = state[el.dataset.t];
+    el.toggleAttribute('data-on', on);
+    const card = el.closest('.e-card');
+    if(card && card.dataset.t) card.querySelector('.e-state').textContent = on ? 'on' : 'off';
+  });
+
+  // the transcript panel reflects its own formats
+  const textCard = $('[data-card="text"]');
+  if(textCard){
+    textCard.toggleAttribute('data-on', state.text);
+    textCard.querySelector('.e-state').textContent = state.text ? 'on' : 'off';
+  }
+
+  const kept=[];
+  if(state.audio) kept.push('MP3');
+  if(state.video) kept.push('video');
+  if(state.text){
+    const fmt=[state.md&&'Markdown',state.pdf&&'PDF'].filter(Boolean).join(' + ');
+    kept.push(fmt ? `${fmt} transcript` : 'transcript');
+  }
+  $('#summary').textContent = kept.length
+    ? `Keeping ${kept.join(', ')}${state.screen&&state.text?', reading the screen':''}`
+    : 'Choose something to keep';
+  $('#go').disabled = kept.length===0;
+}
+
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-t]');
+  if(!el) return;
+  const key=el.dataset.t;
+  // a format implies a transcript; dropping the last format drops it too
+  if(key==='md'||key==='pdf'){
+    const next={...state,[key]:!state[key]};
+    if(!next.md&&!next.pdf){ state.text=false; state.md=false; state.pdf=false; }
+    else { state[key]=!state[key]; state.text=true; }
+  } else if(key==='screen'){
+    state.screen=!state.screen; if(state.screen) state.text=true;
+  } else if(key==='text'){
+    state.text=!state.text;
+    if(state.text&&!state.md&&!state.pdf) state.md=true;
+  } else {
+    state[key]=!state[key];
+  }
+  paint();
+});
+
+$$('.proto button').forEach(b=>b.onclick=()=>{
+  const {set,val}=b.dataset;
+  $$(`.proto [data-set="${set}"]`).forEach(x=>x.classList.toggle('on',x===b));
+  if(set==='accent'){ document.body.dataset.accent=val; return; }
+  $$('.variant').forEach(v=>v.toggleAttribute('data-on', v.dataset.v===val));
+  paint();
+});
+
+$('[data-v="a"]').setAttribute('data-on','');
+paint();
+</script>
+</body>
+</html>
