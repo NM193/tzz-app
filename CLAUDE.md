@@ -136,10 +136,9 @@ screen text via OCR, chapters and a table of contents, markdown and PDF, one
 combined document per queue, local audio and video files, audio recording with
 a menu bar icon and level meter, automatic output-device switching, stopping a
 job mid-run, a Library that searches and filters what is on disk, a picture per
-folder.
+folder, a notification when a run ends.
 
-Not built: a reader inside the app, a notification when a job ends, playlists,
-Windows support.
+Not built: a reader inside the app, playlists, Windows support.
 
 ## Commands
 - `npm run dev` -- run the app (Vite + Tauri)

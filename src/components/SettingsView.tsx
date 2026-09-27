@@ -151,6 +151,17 @@ export function SettingsView({ settings, update, deps, onError }: Props) {
             onChange={(combineQueue) => update({ combineQueue })}
           />
         </Setting>
+
+        <Setting
+          title="Tell me when a run finishes"
+          hint="A notification, but only while the window is behind something else."
+        >
+          <Switch
+            label="Tell me when a run finishes"
+            checked={settings.notify}
+            onChange={(notify) => update({ notify })}
+          />
+        </Setting>
       </div>
 
       <div className="section">

@@ -23,6 +23,8 @@ export type Settings = {
   accent: Accent;
   tint: Tint;
   aurora: Aurora;
+  /** Say something when a run ends and the window is not in front. */
+  notify: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -40,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   accent: "amber",
   tint: "warm",
   aurora: "dusk",
+  notify: true,
 };
 
 // The key is versioned; a shape change bumps it rather than migrating.

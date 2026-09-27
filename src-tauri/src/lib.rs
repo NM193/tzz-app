@@ -7,6 +7,7 @@ pub fn run() {
         .manage(crate::services::recorder::RecorderState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             services::tray::build(app.handle())?;
             // The frontend turns the glass on if that is what was saved.

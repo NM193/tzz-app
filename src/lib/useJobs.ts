@@ -10,6 +10,7 @@ import {
   type JobResult,
   type Stage,
 } from "./api";
+import { summarise, tell } from "./notify";
 import type { QueueItem } from "./queue";
 import type { Settings } from "./settings";
 
@@ -113,6 +114,7 @@ export function useJobs(settings: Settings) {
     // Collected locally: a state updater must stay pure, and StrictMode calls
     // it twice to prove it. Combining from inside one ran the whole thing twice.
     const finished: QueueItem[] = [];
+    let failed = 0;
 
     while (!stopRequested.current) {
       const item = pending.current.shift();
@@ -137,6 +139,7 @@ export function useJobs(settings: Settings) {
           break;
         }
         // A dead link must not take the other nine down with it.
+        failed += 1;
         setQueue((prev) =>
           prev.map((q) =>
             q.id === item.id ? { ...q, status: "failed", error: errorMessage(caught) } : q,
@@ -154,6 +157,11 @@ export function useJobs(settings: Settings) {
     draining.current = false;
     pending.current = [];
     setDetail(null);
+
+    // Said once for the whole run, not once per lecture: ten links would be
+    // ten notifications, and by then you have stopped reading them.
+    const said = cancelled.current ? null : summarise(finished.length, failed);
+    if (latest.current.notify && said) void tell("Tzz App", said);
 
     if (cancelled.current) {
       // Nothing to combine and nothing to announce: the screen goes back to
