@@ -21,6 +21,8 @@ pub struct LibraryEntry {
     pub video_path: Option<String>,
     pub markdown_path: Option<String>,
     pub pdf_path: Option<String>,
+    /// Your own notes, which are markdown too but a different document.
+    pub notes_path: Option<String>,
     /// `poster.jpg`, when this folder already has one.
     pub poster_path: Option<String>,
     /// Seconds since the epoch, for sorting newest first.
@@ -58,6 +60,7 @@ fn describe(folder: &Path) -> Option<LibraryEntry> {
         video_path: None,
         markdown_path: None,
         pdf_path: None,
+        notes_path: None,
         poster_path: thumb::existing(folder).map(|p| p.to_string_lossy().into_owned()),
         modified: modified_at(folder),
     };
@@ -69,6 +72,11 @@ fn describe(folder: &Path) -> Option<LibraryEntry> {
         match ext.as_deref() {
             Some(e) if AUDIO.contains(&e) => entry.audio_path = entry.audio_path.take().or_else(as_string),
             Some(e) if VIDEO.contains(&e) => entry.video_path = entry.video_path.take().or_else(as_string),
+            // `name.notes.md` is markdown as well; it is the notes, not the
+            // transcript, and opening one for the other would be a puzzle.
+            Some("md") if is_notes(&path) => {
+                entry.notes_path = entry.notes_path.take().or_else(as_string)
+            }
             Some("md") => entry.markdown_path = entry.markdown_path.take().or_else(as_string),
             Some("pdf") => entry.pdf_path = entry.pdf_path.take().or_else(as_string),
             _ => {}
@@ -77,6 +85,12 @@ fn describe(folder: &Path) -> Option<LibraryEntry> {
     }
 
     Some(entry)
+}
+
+fn is_notes(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with(".notes.md"))
 }
 
 fn modified_at(path: &Path) -> u64 {
@@ -115,6 +129,19 @@ mod tests {
         assert!(entries[0].markdown_path.is_some());
         assert!(entries[0].video_path.is_none());
         assert!(entries[0].pdf_path.is_none());
+    }
+
+    #[test]
+    fn the_notes_are_not_mistaken_for_the_transcript() {
+        let root = temp_root("notes");
+        let folder = root.join("Lecture [abc]");
+        std::fs::create_dir(&folder).unwrap();
+        std::fs::write(folder.join("Lecture [abc].md"), b"").unwrap();
+        std::fs::write(folder.join("Lecture [abc].notes.md"), b"").unwrap();
+
+        let entry = &list(&root)[0];
+        assert!(entry.markdown_path.as_ref().unwrap().ends_with("Lecture [abc].md"));
+        assert!(entry.notes_path.as_ref().unwrap().ends_with(".notes.md"));
     }
 
     #[test]

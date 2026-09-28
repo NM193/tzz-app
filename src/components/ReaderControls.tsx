@@ -12,6 +12,8 @@ type Props = {
   onGoTo: (index: number) => void;
   /** Which chapter the reader is currently inside. */
   here: number;
+  which: "transcript" | "notes";
+  onWhich: (which: "transcript" | "notes") => void;
   find: string;
   onFind: (value: string) => void;
   found: Scan;
@@ -32,6 +34,8 @@ export function ReaderControls({
   onBack,
   onGoTo,
   here,
+  which,
+  onWhich,
   find,
   onFind,
   found,
@@ -43,6 +47,27 @@ export function ReaderControls({
       <button type="button" className="ghost ghost--small" onClick={onBack}>
         ← Library
       </button>
+
+      {entry.notesPath && entry.markdownPath && (
+        <div className="segmented segmented--wide" role="radiogroup" aria-label="Document">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={which === "transcript"}
+            onClick={() => onWhich("transcript")}
+          >
+            Transcript
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={which === "notes"}
+            onClick={() => onWhich("notes")}
+          >
+            Notes
+          </button>
+        </div>
+      )}
 
       <FindField
         value={find}

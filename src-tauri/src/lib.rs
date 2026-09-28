@@ -35,6 +35,8 @@ pub fn run() {
             commands::library::list_library,
             commands::library::ensure_thumbnail,
             commands::library::open_document,
+            commands::library::read_notes,
+            commands::library::save_note,
             commands::window::set_glass,
             commands::recording::list_audio_inputs,
             commands::recording::set_audio_input,

@@ -10,6 +10,7 @@ use crate::services::binaries::{self, DependencyStatus};
 use crate::services::cancel;
 use crate::services::combine::{self, Section};
 use crate::services::pdf;
+use crate::services::document;
 use crate::services::screen;
 use crate::services::thumb;
 use crate::services::transcript::{self, Screen, Transcript, TranscriptHeader};
@@ -244,7 +245,7 @@ async fn run_job_inner(app: &AppHandle, request: JobRequest) -> Result<JobResult
         audio_path,
         video_path: video_path.map(|p| p.to_string_lossy().into_owned()),
         transcript: result_transcript,
-        warnings,
+        warnings: Vec::new(),
     })
 }
 
@@ -329,6 +330,7 @@ async fn build_transcript(
         markdown: Some(files.markdown),
     }))
 }
+
 
 /// Transcribe a file the user already has. No download, no MP3 conversion --
 /// `whisper_srt` feeds it through ffmpeg itself.
@@ -427,7 +429,7 @@ async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Re
             language: Some(language),
             file_path: files.markdown_path,
             pdf_path: files.pdf_path,
-            markdown: Some(files.markdown),
+                markdown: Some(files.markdown),
         }),
         warnings: Vec::new(),
     })

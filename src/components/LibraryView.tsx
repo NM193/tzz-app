@@ -15,8 +15,8 @@ type Props = {
   settings: Settings;
   library: Library;
   box: RefObject<HTMLOListElement>;
-  /** Open a folder's transcript in the reader. */
-  onOpen: (entry: LibraryEntry) => void;
+  /** Open one of a folder's documents in the reader. */
+  onOpen: (entry: LibraryEntry, which: "transcript" | "notes") => void;
 };
 
 function when(seconds: number): string {
@@ -92,7 +92,11 @@ export function LibraryView({ settings, library, box, onOpen }: Props) {
                 data-cover
                 title={entry.markdownPath ? "Read the transcript" : entry.path}
                 onClick={() =>
-                  entry.markdownPath ? onOpen(entry) : revealInFileManager(entry.path)
+                  entry.markdownPath
+                    ? onOpen(entry, "transcript")
+                    : entry.notesPath
+                      ? onOpen(entry, "notes")
+                      : revealInFileManager(entry.path)
                 }
               >
                 {entry.posterPath ? (
@@ -135,7 +139,11 @@ export function LibraryView({ settings, library, box, onOpen }: Props) {
                 </span>
                 <span className="row__title" data-part>
                   {entry.markdownPath ? (
-                    <button type="button" className="row__open" onClick={() => onOpen(entry)}>
+                    <button
+                      type="button"
+                      className="row__open"
+                      onClick={() => onOpen(entry, "transcript")}
+                    >
                       <Marked text={entry.name} query={query} />
                     </button>
                   ) : (
@@ -167,6 +175,15 @@ export function LibraryView({ settings, library, box, onOpen }: Props) {
                       onClick={() => revealInFileManager(entry.markdownPath!)}
                     >
                       MD
+                    </button>
+                  )}
+                  {entry.notesPath && (
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => onOpen(entry, "notes")}
+                    >
+                      Notes
                     </button>
                   )}
                   {entry.pdfPath && (

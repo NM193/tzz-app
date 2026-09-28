@@ -18,6 +18,9 @@ pub enum Block {
     Said { at: String, text: String },
     /// What was on screen at that moment, read by OCR.
     Screen { at: String, text: String },
+    /// A sub-heading inside a chapter. The notes use these for their own
+    /// sections, which sit below the chapter they belong to.
+    Heading { text: String },
     /// A line the writer did not produce; shown as it is.
     Plain { text: String },
 }
@@ -101,6 +104,11 @@ pub fn parse(markdown: &str) -> Document {
                 }
                 continue;
             }
+        }
+
+        if let Some(rest) = line.strip_prefix("### ") {
+            chapter.blocks.push(Block::Heading { text: rest.trim().to_string() });
+            continue;
         }
 
         if let Some(rest) = line.strip_prefix("**[") {
@@ -220,6 +228,19 @@ mod tests {
         assert_eq!(doc.chapters.len(), 1);
         assert_eq!(doc.chapters[0].title, "");
         assert_eq!(doc.words, 2);
+    }
+
+    #[test]
+    fn the_notes_keep_their_own_sub_headings() {
+        let doc = parse("# Notes\n\n## 1. Intro\n\n### Sažetak\n\nIt teaches grids.\n");
+        assert_eq!(doc.chapters[0].title, "1. Intro");
+        assert_eq!(
+            doc.chapters[0].blocks,
+            vec![
+                Block::Heading { text: "Sažetak".into() },
+                Block::Plain { text: "It teaches grids.".into() },
+            ]
+        );
     }
 
     #[test]

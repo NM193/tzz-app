@@ -31,7 +31,8 @@ macOS ties permissions and settings to it.
   - `binaries` finding external tools · `ytdlp` downloading · `transcript`
     parsing and formatting · `document` parsing one back for the reader ·
     `screen` reading text off video · `pdf` ·
-    `combine` stitching a queue into one document · `recorder` ·
+    `combine` stitching a queue into one document · `notes` your own notes,
+    kept per chapter · `recorder` ·
     `audio_output` CoreAudio · `tray` the menu bar icon · `cancel` stopping a
     job and deleting what it wrote · `library` reading the output folder ·
     `thumb` one picture per folder · `glass` the frosted window
@@ -139,6 +140,13 @@ table of contents and the text that was on screen.
 So effort goes into the quality of the document, not into a model. Summaries,
 courses and quizzes are **deliberately not built** (see the spec above).
 
+A local model was built and removed on 2026-09-28. It worked -- gemma3:27b
+wrote accurate Serbian from an English lecture in about half a minute a
+chapter -- but it was incomplete in ways a prompt could not fix, and it decided
+for the owner which model was worth using. What replaced it is smaller and
+better: each chapter has a **Copy**, and whatever you bring back is kept as a
+note against that chapter. The app carries the text; you choose what reads it.
+
 ## Current status
 Working: single video and queue, MP3, transcript from captions or Whisper,
 screen text via OCR, chapters and a table of contents, markdown and PDF, one
@@ -147,7 +155,7 @@ a menu bar icon and level meter, automatic output-device switching, stopping a
 job mid-run, a Library that searches and filters what is on disk, a picture per
 folder, a notification when a run ends, reading a transcript inside the app,
 unpacking a playlist link into the videos it holds, finding a word in an open
-document.
+document, copying a chapter out and keeping what you bring back as a note.
 
 Not built: Windows support.
 

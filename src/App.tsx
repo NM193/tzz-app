@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { checkDependencies, defaultWhisperModel, setGlass, type DependencyStatus } from "./lib/api";
+import {
+  checkDependencies,
+  defaultWhisperModel,
+  setGlass,
+  type DependencyStatus,
+} from "./lib/api";
 import { fileItem, isPlaylist, knownLink, pendingLink, type PendingLink } from "./lib/queue";
 import { errorMessage, probePlaylist, probeVideo } from "./lib/api";
 import { loadSettings, saveSettings, type Settings } from "./lib/settings";
@@ -18,6 +23,7 @@ import { ReaderView } from "./components/ReaderView";
 import type { LibraryEntry, TranscriptDocument } from "./lib/api";
 import { useLibrary } from "./lib/useLibrary";
 import { scan } from "./lib/find";
+import { readNotes, saveNote } from "./lib/api";
 
 export default function App() {
   const [view, setView] = useState<View>("convert");
@@ -37,14 +43,55 @@ export default function App() {
   const [reading, setReading] = useState<LibraryEntry | null>(null);
   const [doc, setDoc] = useState<TranscriptDocument | null>(null);
   const [showScreens, setShowScreens] = useState(true);
+  /** A folder can hold two documents; this is the one being read. */
+  const [which, setWhich] = useState<"transcript" | "notes">("transcript");
   const [goTo, setGoTo] = useState<number | null>(null);
   const [here, setHere] = useState(0);
   const [find, setFind] = useState("");
+  /** The notes kept for the open transcript, by chapter title. */
+  const [notes, setNotes] = useState<Map<string, string>>(new Map());
   const [hit, setHit] = useState(0);
 
   // One pass over the document numbers every match, so the reader can mark
   // them and the contents can say how many each chapter holds.
   const found = useMemo(() => scan(doc, find, showScreens), [doc, find, showScreens]);
+
+  // Notes belong to the transcript, not to whichever document is being read.
+  useEffect(() => {
+    const transcript = reading?.markdownPath;
+    if (!transcript) {
+      setNotes(new Map());
+      return;
+    }
+    let stale = false;
+    readNotes(transcript)
+      .then((kept) => !stale && setNotes(new Map(kept)))
+      .catch(() => !stale && setNotes(new Map()));
+    return () => {
+      stale = true;
+    };
+  }, [reading?.markdownPath]);
+
+  async function keepNote(chapter: string, body: string) {
+    const entry = reading;
+    if (!entry?.markdownPath) return;
+
+    setNotes((kept) => {
+      const next = new Map(kept);
+      if (body.trim()) next.set(chapter, body.trim());
+      else next.delete(chapter);
+      return next;
+    });
+
+    try {
+      const path = await saveNote(entry.markdownPath, entry.name, chapter, body);
+      // The folder now holds a document it did not before, or no longer does.
+      setReading({ ...entry, notesPath: path });
+      setLibraryVersion((v) => v + 1);
+    } catch (caught) {
+      jobs.setError(errorMessage(caught));
+    }
+  }
 
   // A new query starts at the first match, never wherever the last one ended.
   useEffect(() => setHit(0), [find, doc]);
@@ -225,6 +272,12 @@ export default function App() {
               }}
               onGoTo={setGoTo}
               here={here}
+              which={which}
+              onWhich={(next) => {
+                setWhich(next);
+                setHere(0);
+                setFind("");
+              }}
               find={find}
               onFind={setFind}
               found={found}
@@ -255,6 +308,11 @@ export default function App() {
           (reading ? (
             <ReaderView
               entry={reading}
+              path={
+                (which === "notes" ? reading.notesPath : reading.markdownPath) ??
+                reading.markdownPath ??
+                ""
+              }
               showScreens={showScreens}
               onLoaded={setDoc}
               goTo={goTo}
@@ -263,20 +321,28 @@ export default function App() {
               find={find}
               scan={found}
               hit={hit}
+              notes={notes}
+              onSaveNote={(chapter, body) => void keepNote(chapter, body)}
             />
           ) : (
             <LibraryView
               settings={settings}
               library={library}
               box={resultsRef}
-              onOpen={(entry) => {
+              onOpen={(entry, open) => {
                 setHere(0);
+                setWhich(open);
                 setReading(entry);
               }}
             />
           ))}
         {view === "settings" && (
-          <SettingsView settings={settings} update={update} deps={deps} onError={jobs.setError} />
+          <SettingsView
+            settings={settings}
+            update={update}
+            deps={deps}
+            onError={jobs.setError}
+          />
         )}
       </main>
     </div>

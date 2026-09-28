@@ -194,18 +194,18 @@ mark {
     linear-gradient(170deg, #22302c 0%, #18201e 45%, #0e1211 100%);
 }
 
+/*
+  Three parts: the navigation at the top, the screen's own controls filling
+  what is left, and the status at the bottom. The column itself never scrolls
+  -- only the one list inside it that can grow without limit.
+*/
 .side {
   display: flex;
   flex-direction: column;
   /* The traffic lights sit on the window itself, in this top strip. */
   padding: 2.75rem 1rem 1.25rem;
   border-right: 1px solid var(--line);
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.side::-webkit-scrollbar {
-  display: none;
+  overflow: hidden;
 }
 
 /*
@@ -213,6 +213,10 @@ mark {
   and a second column beside the results cost a third of it.
 */
 .side__tools {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   margin-top: 1.25rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--line);
@@ -304,10 +308,11 @@ mark {
 
 .status {
   display: flex;
+  flex: none;
   gap: 0.625rem;
   align-items: flex-start;
   margin-top: auto;
-  padding: 0 0.625rem;
+  padding: 1.25rem 0.625rem 0;
 }
 
 .status__dot {
@@ -1809,12 +1814,26 @@ mark {
   margin: 1.25rem 0 0.5rem;
 }
 
+/*
+  The only thing here that scrolls. A lecture can have forty-three chapters,
+  and the tick and the folder button below must stay where they are whatever
+  the count.
+*/
 .toc {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 0.5rem;
   display: grid;
   gap: 0.0625rem;
+  align-content: start;
+}
+
+.toc::-webkit-scrollbar {
+  display: none;
 }
 
 .toc button {
@@ -1869,7 +1888,7 @@ mark {
 }
 
 .side__foot {
-  margin-top: 1.25rem;
+  flex: none;
   padding-top: 1rem;
   border-top: 1px solid var(--line);
   display: grid;
@@ -1977,4 +1996,110 @@ mark {
 .toc button i[data-found] {
   opacity: 1;
   color: var(--accent);
+}
+
+/* The notes write their own sections under a chapter. */
+.reader__sub {
+  margin: 1.5rem 0 0.75rem;
+  padding-left: 4rem;
+  font: 500 0.6875rem var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--caption);
+}
+
+.reader__said strong {
+  font-weight: 500;
+  color: var(--bone);
+}
+
+/* Switching between a folder's two documents, in a 13rem column. */
+.segmented--wide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+/* ---------- a chapter's own tools, and the note you bring back ----------- */
+
+.reader__tools {
+  display: flex;
+  gap: 0.125rem;
+  margin: -0.5rem 0 1rem 4rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.reader__chapter:hover .reader__tools,
+.reader__tools:focus-within {
+  opacity: 1;
+}
+
+/*
+  The note is the one thing on this screen the app did not write, so it is the
+  one thing marked in the accent.
+*/
+.note {
+  position: relative;
+  margin: 0 0 1.75rem 4rem;
+  padding: 0.125rem 0 0.125rem 0.875rem;
+  border-left: 2px solid var(--accent);
+}
+
+.note p {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--bone);
+  user-select: text;
+}
+
+.note p:last-of-type {
+  margin-bottom: 0;
+}
+
+.note__edit {
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--caption);
+  font: 500 0.75rem var(--font-sans);
+  transition: color 0.2s;
+}
+
+.note__edit:hover {
+  color: var(--bone);
+}
+
+.note--editing {
+  padding-left: 0.875rem;
+}
+
+.note__field {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--bone);
+  font: 400 0.9375rem/1.65 var(--font-sans);
+  resize: vertical;
+  user-select: text;
+}
+
+.note__field::placeholder {
+  color: var(--caption);
+}
+
+.note__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.cta--small {
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.8125rem;
 }

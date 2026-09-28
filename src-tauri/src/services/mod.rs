@@ -5,6 +5,7 @@ pub mod combine;
 pub mod document;
 pub mod glass;
 pub mod library;
+pub mod notes;
 pub mod pdf;
 pub mod recorder;
 pub mod screen;

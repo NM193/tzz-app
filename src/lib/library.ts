@@ -1,13 +1,14 @@
 import type { LibraryEntry } from "./api";
 
 /** What a folder holds, which is the only thing there is to filter by. */
-export type Filter = "all" | "audio" | "video" | "md" | "pdf";
+export type Filter = "all" | "audio" | "video" | "md" | "notes" | "pdf";
 
 export const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "audio", label: "Audio" },
   { id: "video", label: "Video" },
-  { id: "md", label: "Markdown" },
+  { id: "md", label: "Transcript" },
+  { id: "notes", label: "Notes" },
   { id: "pdf", label: "PDF" },
 ];
 
@@ -21,6 +22,8 @@ export function has(entry: LibraryEntry, filter: Filter): boolean {
       return entry.videoPath !== null;
     case "md":
       return entry.markdownPath !== null;
+    case "notes":
+      return entry.notesPath !== null;
     case "pdf":
       return entry.pdfPath !== null;
   }

@@ -247,6 +247,8 @@ export type LibraryEntry = {
   videoPath: string | null;
   markdownPath: string | null;
   pdfPath: string | null;
+  /** Your own notes, which are markdown too but a different document. */
+  notesPath: string | null;
   /** `poster.jpg` in the folder, when it has one. */
   posterPath: string | null;
   /** Seconds since the epoch. */
@@ -274,6 +276,7 @@ export function ensureThumbnail(path: string): Promise<string | null> {
 export type DocumentBlock =
   | { kind: "said"; at: string; text: string }
   | { kind: "screen"; at: string; text: string }
+  | { kind: "heading"; text: string }
   | { kind: "plain"; text: string };
 
 export type DocumentChapter = {
@@ -293,4 +296,22 @@ export type TranscriptDocument = {
 /** A transcript, parsed for reading inside the app. */
 export function openDocument(path: string): Promise<TranscriptDocument> {
   return invoke("open_document", { path });
+}
+
+/** Every note kept for a transcript, as [chapter title, text]. */
+export function readNotes(transcript: string): Promise<[string, string][]> {
+  return invoke("read_notes", { transcript });
+}
+
+/**
+ * Put a note against a chapter. An empty body removes it; the answer is where
+ * the notes file went, or null when the last note was cleared.
+ */
+export function saveNote(
+  transcript: string,
+  title: string,
+  chapter: string,
+  body: string,
+): Promise<string | null> {
+  return invoke("save_note", { transcript, title, chapter, body });
 }

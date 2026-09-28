@@ -245,6 +245,15 @@ pub async fn download_audio(
         format!("download:{PROGRESS_TAG} download %(progress._percent_str)s %(progress._eta_str)s"),
         "--progress-template".into(),
         format!("postprocess:{PROGRESS_TAG} postprocess %(progress._percent_str)s"),
+        // YouTube answers a burst from one address with a 403 that is gone a
+        // moment later. Without these a job of ten lectures loses one for no
+        // lasting reason.
+        "--retries".into(),
+        "10".into(),
+        "--extractor-retries".into(),
+        "3".into(),
+        "--fragment-retries".into(),
+        "10".into(),
         "--extract-audio".into(),
         "--audio-format".into(),
         "mp3".into(),
@@ -362,6 +371,7 @@ pub async fn download_video(
 
     let mut child = Command::new(ytdlp)
         .args(["--no-playlist", "--newline", "--no-part", "-f", "bv*"])
+        .args(["--retries", "10", "--extractor-retries", "3", "--fragment-retries", "10"])
         .arg("--progress-template")
         .arg(format!(
             "download:{PROGRESS_TAG} download %(progress._percent_str)s %(progress._eta_str)s"
@@ -508,20 +518,62 @@ fn collect_outputs(dir: &Path, video_id: &str) -> Result<DownloadOutput, String>
 }
 
 /// yt-dlp errors are verbose; the useful part is at the end.
+/// What to show when a job produced nothing.
+///
+/// yt-dlp narrates everything it does, so the tail of its output is mostly
+/// housekeeping -- files it deleted, thumbnails it converted -- with the one
+/// line that matters buried in it. Only the errors are worth reading, and a
+/// 403 gets named, because it means "try again" rather than "this is broken".
 fn tail_of(text: &str) -> String {
-    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
-    let start = lines.len().saturating_sub(6);
-    let message = lines[start..].join("\n");
-    if message.is_empty() {
-        "yt-dlp failed without an error message.".to_string()
-    } else {
-        message
+    let errors: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("ERROR:"))
+        .map(|line| line.trim_start_matches("ERROR:").trim())
+        .collect();
+
+    if errors.iter().any(|line| line.contains("403")) {
+        return "YouTube refused the download (403). It does that to a burst of \
+                requests and stops within a minute -- try again."
+            .to_string();
+    }
+    if errors.iter().any(|line| line.contains("429")) {
+        return "YouTube rate-limited this address (429). Wait a few minutes and \
+                try again."
+            .to_string();
+    }
+
+    match errors.last() {
+        Some(line) => line.to_string(),
+        None => "yt-dlp failed without saying why.".to_string(),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_refusal_is_named_rather_than_quoted() {
+        let log = "[download] Destination: x.webm\n\
+                   Deleting original file x.vtt (pass -k to keep)\n\
+                   ERROR: unable to download video data: HTTP Error 403: Forbidden";
+        assert!(tail_of(log).contains("try again"), "{}", tail_of(log));
+        assert!(!tail_of(log).contains("Deleting"), "{}", tail_of(log));
+    }
+
+    #[test]
+    fn housekeeping_is_never_shown_as_the_reason() {
+        let log = "WARNING: Skipping embedding sr subtitle\n\
+                   [ThumbnailsConvertor] Converting thumbnail\n\
+                   ERROR: Requested format is not available";
+        assert_eq!(tail_of(log), "Requested format is not available");
+    }
+
+    #[test]
+    fn something_has_to_be_said_even_with_no_error_line() {
+        assert_eq!(tail_of("[download] 100%"), "yt-dlp failed without saying why.");
+    }
 
     #[test]
     fn asks_for_each_language_and_its_original_track_only() {

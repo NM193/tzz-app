@@ -1,5 +1,6 @@
 use crate::services::document::{self, Document};
 use crate::services::library::{self, LibraryEntry};
+use crate::services::notes;
 use crate::services::thumb;
 
 use super::media::resolve_out_dir;
@@ -51,4 +52,50 @@ pub async fn open_document(path: String) -> Result<Document, String> {
         .map_err(|e| format!("Could not read that document: {e}"))?;
 
     Ok(document::parse(&markdown))
+}
+
+/// Where a transcript's notes live: `<transcript>.notes.md`.
+fn notes_path(transcript: &str) -> std::path::PathBuf {
+    let path = std::path::Path::new(transcript);
+    let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    path.with_file_name(format!("{stem}.notes.md"))
+}
+
+/// Every note kept for this transcript, as chapter title to text.
+#[tauri::command]
+pub fn read_notes(transcript: String) -> Vec<(String, String)> {
+    let path = notes_path(&transcript);
+    let Ok(markdown) = std::fs::read_to_string(&path) else {
+        return Vec::new();
+    };
+    notes::parse(notes::body_of(&markdown))
+        .into_iter()
+        .map(|note| (note.chapter.to_string(), note.body.to_string()))
+        .collect()
+}
+
+/// Put a note against a chapter. An empty body removes it.
+///
+/// The whole file is rewritten each time: these are a few kilobytes, and a
+/// rewrite cannot leave a half-edited document behind.
+#[tauri::command]
+pub fn save_note(
+    transcript: String,
+    title: String,
+    chapter: String,
+    body: String,
+) -> Result<Option<String>, String> {
+    let path = notes_path(&transcript);
+    let current = std::fs::read_to_string(&path).unwrap_or_default();
+    let updated = notes::upsert(notes::body_of(&current), &chapter, &body);
+
+    if updated.trim().is_empty() {
+        // The last note was cleared; leave no empty document behind.
+        let _ = std::fs::remove_file(&path);
+        return Ok(None);
+    }
+
+    std::fs::write(&path, notes::document(&title, &updated))
+        .map_err(|e| format!("Could not save the note: {e}"))?;
+    Ok(Some(path.to_string_lossy().into_owned()))
 }
