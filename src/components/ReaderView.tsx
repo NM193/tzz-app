@@ -239,6 +239,8 @@ export function ReaderView({
             <ChapterNote
               key={`${chapter.title}:${notes.get(chapter.title) ?? ""}`}
               note={notes.get(chapter.title) ?? ""}
+              start={writing === chapter.title}
+              onCancel={() => setWriting(null)}
               onSave={(body) => {
                 setWriting(null);
                 onSaveNote(chapter.title, body);

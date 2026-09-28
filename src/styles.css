@@ -2023,11 +2023,16 @@ mark {
 
 /* ---------- a chapter's own tools, and the note you bring back ----------- */
 
+/*
+  Copying a chapter out is the main thing this screen is for, so the buttons
+  are always there -- dim until the chapter is under the pointer, never
+  hidden behind one.
+*/
 .reader__tools {
   display: flex;
   gap: 0.125rem;
-  margin: -0.5rem 0 1rem 4rem;
-  opacity: 0;
+  margin: -0.5rem 0 1rem 3.5rem;
+  opacity: 0.45;
   transition: opacity 0.2s;
 }
 

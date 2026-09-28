@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 
 type Props = {
   note: string;
+  /** Open straight into the field. A note with no text to show would be blank. */
+  start?: boolean;
   onSave: (body: string) => void;
+  onCancel: () => void;
 };
 
 /**
@@ -12,15 +15,13 @@ type Props = {
  * like, and paste the answer in -- so the note is yours, and so is the choice
  * of what produced it.
  */
-export function ChapterNote({ note, onSave }: Props) {
-  const [editing, setEditing] = useState(false);
+export function ChapterNote({ note, start = false, onSave, onCancel }: Props) {
+  const [editing, setEditing] = useState(start);
   const [draft, setDraft] = useState(note);
   const field = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    setDraft(note);
-    setEditing(false);
-  }, [note]);
+  // No effect resets this from `note`: the reader gives the component a key
+  // that carries the note, so a changed note arrives as a fresh component.
 
   useEffect(() => {
     if (!editing) return;
@@ -46,6 +47,7 @@ export function ChapterNote({ note, onSave }: Props) {
             if (event.key === "Escape") {
               setDraft(note);
               setEditing(false);
+              onCancel();
             }
             if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
               onSave(draft);
@@ -60,6 +62,7 @@ export function ChapterNote({ note, onSave }: Props) {
             onClick={() => {
               setDraft(note);
               setEditing(false);
+              onCancel();
             }}
           >
             Cancel
@@ -90,14 +93,5 @@ export function ChapterNote({ note, onSave }: Props) {
         Edit
       </button>
     </div>
-  );
-}
-
-/** The button that starts a note, shown when there is none yet. */
-export function AddNote({ onClick }: { onClick: () => void }) {
-  return (
-    <button type="button" className="icon-button" onClick={onClick}>
-      Add a note
-    </button>
   );
 }
