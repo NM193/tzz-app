@@ -113,12 +113,44 @@ if [ -z "$archive" ] || [ ! -f "$archive.sig" ]; then
   exit 1
 fi
 
-# The manifest the app reads. Its url has to name the asset exactly as GitHub
-# will serve it, so the name is taken from the file itself.
-python3 - "$version" "$notes" "$repo" "$archive" <<'PY'
-import json, os, sys, datetime
-version, notes, repo, archive = sys.argv[1:5]
-name = os.path.basename(archive)
+echo "== release v$version"
+git add -A
+git commit -qm "Version $version" || true
+git tag -f "v$version"
+git push -q origin HEAD
+git push -q -f origin "v$version"
+
+# Re-runnable on purpose. A release that got as far as uploading and then fell
+# over -- a bad manifest, a wrong signature -- is mended by running this again,
+# not by deleting it and hoping. The archive and its signature go up together
+# or the manifest would describe bytes nobody has.
+if gh release view "v$version" > /dev/null 2>&1; then
+  echo "   v$version exists; replacing what it holds"
+  gh release edit "v$version" --title "Tzz App $version" --notes "$notes" > /dev/null
+  gh release upload "v$version" \
+    "$archive" "$archive.sig" "$bundle"/dmg/*.dmg --clobber
+else
+  gh release create "v$version" \
+    --title "Tzz App $version" \
+    --notes "$notes" \
+    "$archive" "$archive.sig" "$bundle"/dmg/*.dmg
+fi
+
+# The manifest goes up second, because its url has to name the archive exactly
+# as GitHub serves it -- and GitHub renames what it is given. "Tzz App.app.tar.gz"
+# arrives as "Tzz.App.app.tar.gz", so a name taken from the file on disk points
+# at nothing: the app announces an update and then cannot fetch it. The only
+# reliable source for that name is GitHub itself, after the upload.
+url="$(gh release view "v$version" --json assets \
+  -q '.assets[] | select(.name | endswith(".app.tar.gz")) | .url')"
+if [ -z "$url" ]; then
+  echo "The release has no .app.tar.gz asset. Nothing to point the manifest at."
+  exit 1
+fi
+
+python3 - "$version" "$notes" "$url" "$archive" <<'MANIFEST'
+import datetime, json, sys
+version, notes, url, archive = sys.argv[1:5]
 json.dump({
     "version": version,
     "notes": notes,
@@ -127,24 +159,26 @@ json.dump({
     "platforms": {
         "darwin-aarch64": {
             "signature": open(archive + ".sig").read().strip(),
-            "url": f"https://github.com/{repo}/releases/download/v{version}/{name}",
+            "url": url,
         }
     },
 }, open("latest.json", "w"), indent=2)
-PY
+MANIFEST
 
-echo "== release v$version"
-git add -A
-git commit -qm "Version $version" || true
-git tag -f "v$version"
-git push -q origin HEAD
-git push -q -f origin "v$version"
-
-gh release create "v$version" \
-  --title "Tzz App $version" \
-  --notes "$notes" \
-  "$archive" "$archive.sig" latest.json "$bundle"/dmg/*.dmg
-
+gh release upload "v$version" latest.json --clobber
 rm -f latest.json
+
+echo
+echo "== check"
+# Proof rather than hope: the address the app will be handed is fetched.
+manifest="https://github.com/$repo/releases/latest/download/latest.json"
+got="$(curl -fsSL "$manifest" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["platforms"]["darwin-aarch64"]["url"])')"
+code="$(curl -sIL -o /dev/null -w '%{http_code}' "$got")"
+echo "   manifest: $manifest"
+echo "   archive:  $got"
+echo "   fetching it says: $code"
+[ "$code" = 200 ] || { echo "   that is not a download. The update would fail."; exit 1; }
+
 echo
 echo "Done. The app will see it the next time it starts."
