@@ -147,17 +147,28 @@ script once on a fresh clone, before `npm run build`.
   the Mac's own sound.
 - The app is unsigned, so the first open needs right-click -> Open.
 
-**Updates come from GitHub Releases.** `scripts/release.sh <version> "notes"`
-sets the version, builds, signs, writes the `latest.json` the app reads, and
-runs `gh release create`. `UpdateNotice` asks once at launch and never again
-while the app is open: an update that interrupts an hour-long transcription to
-announce itself is worse than one that waits until tomorrow. Only
-`darwin-aarch64` is published, because the bundled ffmpeg is arm64.
+**Updates come from GitHub Releases**, out of the public repo `NM193/tzz-app`.
+`scripts/release.sh <version> "notes"` sets the version, builds, signs,
+publishes, and then checks its own work. `UpdateNotice` asks once at launch and
+never again while the app is open: an update that interrupts an hour-long
+transcription to announce itself is worse than one that waits until tomorrow.
+Only `darwin-aarch64` is published, because the bundled ffmpeg is arm64.
 
-Two things are the owner's alone, and the code must never do either: the
-signing key (`npx tauri signer generate` -- only its public half belongs in
-`plugins.updater.pubkey`) and creating the repo, which has to be public for
-downloads to work without a token.
+The key lives at `~/.tauri/tzz.key`, outside the repo, and has no password, so
+a release needs nothing interactive. **Never read it** -- only `tzz.key.pub`,
+and only to fill `plugins.updater.pubkey`. The app trusts that one key and no
+other, so replacing the key after a release breaks every installed copy.
+
+Three things here were bugs, and the script now proves each one rather than
+assuming it:
+
+- **GitHub renames assets.** `Tzz App.app.tar.gz` is served as
+  `Tzz.App.app.tar.gz`. A url built from the filename 404s, and the app
+  announces an update it cannot fetch. The name is read back from GitHub.
+- **`releases/latest` lags by seconds.** Checking it straight after publishing
+  validates the *previous* release's manifest and passes.
+- **A signature belongs to particular bytes.** The archive, its signature and
+  the manifest are replaced together or not at all.
 
 ## What this is for
 The point is not to answer questions about a lecture -- **NotebookLM does that
