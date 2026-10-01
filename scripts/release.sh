@@ -35,27 +35,34 @@ fi
 # An environment that already carries the key wins, so a machine that keeps it
 # somewhere else -- a CI runner, say -- needs no change here.
 key="$HOME/.tauri/tzz.key"
+ours=no
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
   if [ ! -f "$key" ]; then
     echo "No signing key at $key. Make one, once:"
-    echo "  npx tauri signer generate -w ~/.tauri/tzz.key"
+    echo "  npx tauri signer generate -w ~/.tauri/tzz.key -p \"\" -f --ci"
     exit 1
   fi
+  ours=yes
   export TAURI_SIGNING_PRIVATE_KEY="$(cat "$key")"
 fi
 
 # A key may have no password at all, and nothing in the file says which. So
 # this signs a throwaway file with an empty one and believes the answer -- it
 # is a second of certainty instead of a guess that surfaces as a failed build.
+# Only for our own key: one handed over in the environment comes with its own
+# password, or none, and is not ours to interrogate.
 #
 # When the key does want a password, the first release asks for it rather than
 # printing the command that would. `security` does the asking, so the password
 # goes from the terminal into the Keychain and through nothing in between: not
 # this script, not the shell history, not a shell profile.
-if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
+if [ "$ours" = yes ] && [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
   probe="$(mktemp)"
   echo probe > "$probe"
-  if npx tauri signer sign -f "$key" -p "" "$probe" > /dev/null 2>&1; then
+  # `env -u` is not decoration: with the key in the environment the CLI stops
+  # honouring -f and asks for a flag that is not this one.
+  if env -u TAURI_SIGNING_PRIVATE_KEY \
+      npx tauri signer sign -f "$key" -p "" "$probe" > /dev/null 2>&1; then
     export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
   elif security find-generic-password -s tzz-signing > /dev/null 2>&1; then
     export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(security find-generic-password -s tzz-signing -w)"
