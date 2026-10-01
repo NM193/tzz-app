@@ -1,53 +1,47 @@
 /*
-  The popup only shows what the background has collected and asks it to start.
-  It holds no state of its own, because Chrome closes it whenever the tab
-  navigates -- which is exactly what collecting a course does.
+  The popup shows what the worker collected and asks it to collect more. It
+  keeps nothing of its own: it can be closed at any moment, including in the
+  middle of a course, and reopening it shows where things got to.
 */
 
 const $ = (id) => document.getElementById(id);
 
-async function tab() {
+const tab = async () => {
   const [current] = await chrome.tabs.query({ active: true, currentWindow: true });
   return current;
-}
+};
 
 function draw(state) {
   const found = state.found ?? [];
 
   $("list").innerHTML = found
     .map(
-      (lesson, index) =>
-        `<li ${lesson.url ? "" : 'class="none"'}><i>${String(index + 1).padStart(2, "0")}</i><span></span></li>`,
+      (_, index) =>
+        `<li><i>${String(index + 1).padStart(2, "0")}</i><span></span></li>`,
     )
     .join("");
-  // Names are written as text, never as markup: they come from a web page.
-  $("list").querySelectorAll("span").forEach((cell, index) => {
-    cell.textContent = found[index].name;
-    // Which page it read, so a wrong walk can be seen rather than guessed.
-    cell.title = found[index].from ?? "";
+  // Names are written as text, never as markup: they come off a web page.
+  $("list").querySelectorAll("li").forEach((row, index) => {
+    row.querySelector("span").textContent = found[index].name;
+    if (!found[index].url) row.className = "none";
   });
 
   $("status").textContent = state.status ?? "";
+  $("error").textContent = state.error ?? "";
   $("copy").disabled = !found.some((lesson) => lesson.url);
-  $("walk").textContent = state.running ? "Stop" : "Collect the course";
-  $("one").disabled = !!state.running;
+  $("course").disabled = !!state.running;
+  $("lesson").disabled = !!state.running;
 }
 
 chrome.storage.local.get(null).then(draw);
 chrome.storage.onChanged.addListener(() => chrome.storage.local.get(null).then(draw));
 
-$("walk").onclick = async () => {
-  const state = await chrome.storage.local.get(null);
-  const current = await tab();
-  chrome.runtime.sendMessage({ type: state.running ? "stop" : "walk", tabId: current.id });
-};
+const ask = (type) => async () =>
+  chrome.runtime.sendMessage({ type, tabId: (await tab()).id });
 
-$("one").onclick = async () => {
-  const current = await tab();
-  chrome.runtime.sendMessage({ type: "one", tabId: current.id });
-};
-
-$("clear").onclick = () => chrome.storage.local.set({ found: [], status: "" });
+$("course").onclick = ask("course");
+$("lesson").onclick = ask("lesson");
+$("clear").onclick = ask("clear");
 
 $("copy").onclick = async () => {
   const { found = [] } = await chrome.storage.local.get("found");
@@ -61,7 +55,7 @@ $("copy").onclick = async () => {
 };
 
 tab().then((current) => {
-  $("where").textContent = /thinkific\.com/.test(current?.url ?? "")
-    ? "Open the course contents so every lesson is listed, then collect."
-    : "Open a Thinkific course page first.";
+  $("where").textContent = /thinkific\.com\/courses\/take\//.test(current?.url ?? "")
+    ? "Collect reads the whole course without leaving this page."
+    : "Open a lesson of the course first.";
 });

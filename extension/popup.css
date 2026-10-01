@@ -49,6 +49,10 @@ header span {
   color: var(--caption);
 }
 
+/* What went wrong, said plainly. Empty most of the time, so it takes no room. */
+.note--loud:empty { display: none; }
+.note--loud { color: var(--bone); }
+
 .actions { display: flex; gap: 6px; margin: 10px 0; }
 .actions--end { justify-content: flex-end; }
 

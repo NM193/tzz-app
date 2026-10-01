@@ -21,24 +21,34 @@ you. Only something inside the browser can see it.
 
 ## Use
 
-1. Open the course in the Chrome profile you are signed in with.
-2. **Open the contents so every lesson is listed.** The extension can only see
-   links that are on the page: a collapsed sidebar, or one that lists a single
-   section, is all it will find. It says how many it found before it starts.
-3. Click the extension → **Collect the course**. It opens each lesson in turn
-   and reads its video id, in one tab, in place, and puts you back where you
-   started. **Just this lesson** does only the one you are on.
-4. **Copy all**, then paste into Tzz App's link field.
+1. Open any lesson of the course, in the Chrome profile you are signed in with.
+2. Click the extension → **Collect the course**.
+3. **Copy all**, then paste into Tzz App's link field.
 
-The walk runs in the background, not in the popup: Chrome closes a popup the
-moment the tab navigates, which is exactly what collecting does. You can close
-the popup and reopen it to watch; **Stop** ends it early.
+**Just this lesson** does only the one you are looking at, and reads it off the
+page rather than asking for the course -- useful if a course is arranged in a
+way the first button does not understand.
+
+Nothing navigates and nothing opens in a new tab: you stay on the lesson you
+were on. The popup can be closed while it works; what it found is kept, and
+reopening it shows where things got to.
+
+## How it reads the course
+
+Through the course player's own API, the same one the page uses: one request
+lists every chapter and lesson under its real name, and one request per lesson
+carries the Wistia id. Your browser's cookies make those requests
+authenticated, so it sees exactly what you see and nothing more.
+
+The first version instead opened every lesson in turn and read the player out
+of the DOM. That is a worse idea in four separate ways, written up at the top
+of `collect.js`; the short of it is that it found three lessons in a course of
+forty and gave them all the same name.
 
 ## What it does and does not do
 
-It reads the page you opened. It makes no requests of its own, has no server
-and no account, and the only thing it writes is the clipboard and its own list,
-kept in Chrome so it survives closing the popup.
+It has no server and no account, and the only things it writes are the
+clipboard and its own list, kept in Chrome so it survives closing the popup.
 
-It needs you to be signed in, because it only ever sees what your browser
-already shows you. It does not get past anything you could not open yourself.
+It needs you to be signed in, because it only ever asks for what your browser
+already has. It does not get past anything you could not open yourself.
