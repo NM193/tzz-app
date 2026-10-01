@@ -4,15 +4,16 @@
 #
 #   bash scripts/release.sh 0.2.0 "What changed, in a sentence or two."
 #
-# The private key never lives in this repo. It comes from the environment, and
-# without it the build produces no signature -- which the app would refuse,
-# that being the whole point of signing. Set it up once:
+# The key is found, not asked for. It lives at ~/.tauri/tzz.key, outside the
+# repo, and its password lives in the Keychain -- which is the only arrangement
+# where having a password on the key means anything. Neither is ever printed.
+#
+# Made once, and never again:
 #
 #   npx tauri signer generate -w ~/.tauri/tzz.key
-#   # then put the public half in src-tauri/tauri.conf.json -> plugins.updater.pubkey
-#   # and in your shell profile:
-#   export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/tzz.key)"
-#   export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="…"
+#   security add-generic-password -a "$USER" -s tzz-signing -U -w
+#   # then the public half of the key goes in
+#   # src-tauri/tauri.conf.json -> plugins.updater.pubkey
 #
 # Only Apple Silicon is built, because the ffmpeg this app carries is arm64.
 
@@ -27,9 +28,28 @@ if [ -z "$version" ]; then
   exit 1
 fi
 
+# An environment that already carries the key wins, so a machine that keeps it
+# somewhere else -- a CI runner, say -- needs no change here.
+key="$HOME/.tauri/tzz.key"
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
-  echo "TAURI_SIGNING_PRIVATE_KEY is not set -- see the comment at the top of this script."
-  exit 1
+  if [ ! -f "$key" ]; then
+    echo "No signing key at $key. Make one, once:"
+    echo "  npx tauri signer generate -w ~/.tauri/tzz.key"
+    exit 1
+  fi
+  export TAURI_SIGNING_PRIVATE_KEY="$(cat "$key")"
+fi
+
+# An empty password is a real answer: a key can be made without one.
+if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
+  if ! security find-generic-password -s tzz-signing >/dev/null 2>&1; then
+    echo "The key's password is not in the Keychain. Put it there, once:"
+    echo "  security add-generic-password -a \"\$USER\" -s tzz-signing -U -w"
+    echo
+    echo "It will ask for the password you set when you generated the key."
+    exit 1
+  fi
+  export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(security find-generic-password -s tzz-signing -w)"
 fi
 
 if ! python3 -c 'import json,sys; sys.exit(0 if json.load(open("src-tauri/tauri.conf.json"))["plugins"]["updater"]["pubkey"] else 1)'; then
