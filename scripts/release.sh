@@ -170,15 +170,45 @@ rm -f latest.json
 
 echo
 echo "== check"
-# Proof rather than hope: the address the app will be handed is fetched.
-manifest="https://github.com/$repo/releases/latest/download/latest.json"
-got="$(curl -fsSL "$manifest" \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["platforms"]["darwin-aarch64"]["url"])')"
+
+# This release's own manifest, not whatever /latest happens to be pointing at.
+# Asking /latest straight after a release gets the release before it for a few
+# seconds, which is how a check can read a stale file and still say 200.
+here="$(mktemp -d)"
+gh release download "v$version" -p latest.json -D "$here" --clobber > /dev/null
+
+got="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["platforms"]["darwin-aarch64"]["url"])' "$here/latest.json")"
 code="$(curl -sIL -o /dev/null -w '%{http_code}' "$got")"
-echo "   manifest: $manifest"
 echo "   archive:  $got"
 echo "   fetching it says: $code"
 [ "$code" = 200 ] || { echo "   that is not a download. The update would fail."; exit 1; }
+
+# The signature has to be the one made for these bytes. A manifest carrying
+# some other release's signature downloads fine and is then rejected, which
+# looks like a broken app rather than a broken release.
+if ! python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["platforms"]["darwin-aarch64"]["signature"] == open(sys.argv[2]).read().strip() else 1)' \
+    "$here/latest.json" "$archive.sig"; then
+  echo "   the manifest's signature is not this build's. The app would refuse it."
+  exit 1
+fi
+echo "   signature:  matches this build"
+rm -rf "$here"
+
+# And finally the address the app is actually given, once GitHub agrees that
+# this is the newest release.
+manifest="https://github.com/$repo/releases/latest/download/latest.json"
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  serving="$(curl -fsSL "$manifest" 2> /dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' 2> /dev/null || true)"
+  [ "$serving" = "$version" ] && break
+  sleep 3
+done
+echo "   $manifest serves: ${serving:-nothing yet}"
+if [ "$serving" != "$version" ]; then
+  echo "   GitHub still calls an older release the newest. It usually catches up;"
+  echo "   if it does not, the release is there but the app will not see it."
+  exit 1
+fi
 
 echo
 echo "Done. The app will see it the next time it starts."
