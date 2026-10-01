@@ -103,3 +103,10 @@ li span {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* A lesson with nothing to download: shown, so a short list is not a mystery. */
+li.none { opacity: 0.4; }
+li.none span::after {
+  content: " — no video";
+  color: var(--caption);
+}

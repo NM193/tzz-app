@@ -22,11 +22,17 @@ you. Only something inside the browser can see it.
 ## Use
 
 1. Open the course in the Chrome profile you are signed in with.
-2. Click the extension.
-3. **Collect the course** — it opens each lesson in turn and reads its video
-   id. One tab, in place; it puts you back where you started when it finishes.
-   **Just this lesson** does only the one you are on.
+2. **Open the contents so every lesson is listed.** The extension can only see
+   links that are on the page: a collapsed sidebar, or one that lists a single
+   section, is all it will find. It says how many it found before it starts.
+3. Click the extension → **Collect the course**. It opens each lesson in turn
+   and reads its video id, in one tab, in place, and puts you back where you
+   started. **Just this lesson** does only the one you are on.
 4. **Copy all**, then paste into Tzz App's link field.
+
+The walk runs in the background, not in the popup: Chrome closes a popup the
+moment the tab navigates, which is exactly what collecting does. You can close
+the popup and reopen it to watch; **Stop** ends it early.
 
 ## What it does and does not do
 
