@@ -12,7 +12,11 @@
 # So two are fetched as the portable builds their authors publish, and whisper
 # is built here with nothing left outside it.
 #
-# Run it again to refresh. `npm run build` expects the results to be present.
+# A tool that is already here and answers for itself is left alone, because a
+# release runs this every time and 90 MB a release is a toll for nothing.
+# `--force` fetches and builds all three again regardless.
+#
+# `npm run build` expects the results to be present.
 # Needs: cmake and git (for whisper), curl and unzip.
 
 set -euo pipefail
@@ -27,25 +31,41 @@ TARGET="$(rustc -vV | sed -n 's/^host: //p')"
 mkdir -p "$OUT" "$WORK"
 say() { printf '\n== %s\n' "$1"; }
 
-say "yt-dlp"
+force=no
+[ "${1:-}" = "--force" ] && force=yes
+
+# Here, and able to run. A tool that cannot run is not here, whatever the
+# directory listing says: a half-written download is the shape this goes
+# wrong in, and it is the same size as a whole one until it is tried.
+have() {
+  local tool="$OUT/$1-$TARGET"
+  [ "$force" = no ] || return 1
+  [ -x "$tool" ] || return 1
+  shift
+  "$tool" "$@" > /dev/null 2>&1
+}
+
 # The standalone build: one file, and no Python needed on the machine.
-curl -fsSL -o "$OUT/yt-dlp-$TARGET" \
-  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
-chmod +x "$OUT/yt-dlp-$TARGET"
-"$OUT/yt-dlp-$TARGET" --version | sed 's/^/   /'
+fetch_ytdlp() {
+  curl -fsSL -o "$OUT/yt-dlp-$TARGET" \
+    "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
+  chmod +x "$OUT/yt-dlp-$TARGET"
+  "$OUT/yt-dlp-$TARGET" --version | sed 's/^/   /'
+}
 
-say "ffmpeg"
 # A static arm64 build. Homebrew's own is linked against Homebrew.
-tmp="$(mktemp -d)"
-curl -fsSL -o "$tmp/ffmpeg.zip" "https://www.osxexperts.net/ffmpeg711arm.zip"
-unzip -qo "$tmp/ffmpeg.zip" -d "$tmp"
-rm -f "$OUT/ffmpeg-$TARGET"
-mv "$tmp/ffmpeg" "$OUT/ffmpeg-$TARGET"
-chmod +x "$OUT/ffmpeg-$TARGET"
-rm -rf "$tmp"
-"$OUT/ffmpeg-$TARGET" -version | head -1 | sed 's/^/   /'
+fetch_ffmpeg() {
+  local tmp
+  tmp="$(mktemp -d)"
+  curl -fsSL -o "$tmp/ffmpeg.zip" "https://www.osxexperts.net/ffmpeg711arm.zip"
+  unzip -qo "$tmp/ffmpeg.zip" -d "$tmp"
+  rm -f "$OUT/ffmpeg-$TARGET"
+  mv "$tmp/ffmpeg" "$OUT/ffmpeg-$TARGET"
+  chmod +x "$OUT/ffmpeg-$TARGET"
+  rm -rf "$tmp"
+  "$OUT/ffmpeg-$TARGET" -version | head -1 | sed 's/^/   /'
+}
 
-say "whisper-cli"
 # Built rather than copied, and that is the whole point of the flags:
 #
 #   BUILD_SHARED_LIBS=OFF   the libraries go inside the binary
@@ -58,40 +78,55 @@ say "whisper-cli"
 #   OPENMP=OFF              one fewer Homebrew library to chase.
 #
 # The result is about five megabytes and needs nothing but macOS itself.
-if ! command -v cmake >/dev/null; then
-  echo "   cmake is needed to build it: brew install cmake"
-  exit 1
-fi
+build_whisper() {
+  if ! command -v cmake > /dev/null; then
+    echo "   cmake is needed to build it: brew install cmake"
+    exit 1
+  fi
 
-if [ -d "$WORK/whisper.cpp/.git" ]; then
-  git -C "$WORK/whisper.cpp" pull --quiet --ff-only || true
-else
-  git clone --depth 1 --quiet https://github.com/ggml-org/whisper.cpp "$WORK/whisper.cpp"
-fi
+  if [ -d "$WORK/whisper.cpp/.git" ]; then
+    git -C "$WORK/whisper.cpp" pull --quiet --ff-only || true
+  else
+    git clone --depth 1 --quiet https://github.com/ggml-org/whisper.cpp "$WORK/whisper.cpp"
+  fi
 
-cmake -S "$WORK/whisper.cpp" -B "$WORK/whisper.cpp/build" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=OFF \
-  -DGGML_BACKEND_DL=OFF \
-  -DGGML_METAL=ON \
-  -DGGML_METAL_EMBED_LIBRARY=ON \
-  -DGGML_OPENMP=OFF \
-  -DWHISPER_BUILD_TESTS=OFF \
-  -DWHISPER_BUILD_SERVER=OFF \
-  > /dev/null
-cmake --build "$WORK/whisper.cpp/build" --config Release -j > /dev/null
+  cmake -S "$WORK/whisper.cpp" -B "$WORK/whisper.cpp/build" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DGGML_BACKEND_DL=OFF \
+    -DGGML_METAL=ON \
+    -DGGML_METAL_EMBED_LIBRARY=ON \
+    -DGGML_OPENMP=OFF \
+    -DWHISPER_BUILD_TESTS=OFF \
+    -DWHISPER_BUILD_SERVER=OFF \
+    > /dev/null
+  cmake --build "$WORK/whisper.cpp/build" --config Release -j > /dev/null
 
-rm -f "$OUT/whisper-cli-$TARGET"
-cp "$WORK/whisper.cpp/build/bin/whisper-cli" "$OUT/whisper-cli-$TARGET"
-chmod +x "$OUT/whisper-cli-$TARGET"
+  rm -f "$OUT/whisper-cli-$TARGET"
+  cp "$WORK/whisper.cpp/build/bin/whisper-cli" "$OUT/whisper-cli-$TARGET"
+  chmod +x "$OUT/whisper-cli-$TARGET"
 
-left="$(otool -L "$OUT/whisper-cli-$TARGET" | awk 'NR>1 {print $1}' | grep -vE "^\s*(/usr/lib|/System)" || true)"
-if [ -n "$left" ]; then
-  echo "   still needs something from outside:"
-  echo "$left" | sed 's/^/     /'
-  exit 1
-fi
-echo "   self-contained"
+  # Nothing outside /usr/lib or /System, or it is not self-contained and the
+  # Mac it is going to will say so instead of this script.
+  local left
+  left="$(otool -L "$OUT/whisper-cli-$TARGET" | awk 'NR>1 {print $1}' \
+    | grep -vE "^\s*(/usr/lib|/System)" || true)"
+  if [ -n "$left" ]; then
+    echo "   still needs something from outside:"
+    echo "$left" | sed 's/^/     /'
+    exit 1
+  fi
+  echo "   self-contained"
+}
+
+say "yt-dlp"
+have yt-dlp --version && echo "   already here" || fetch_ytdlp
+
+say "ffmpeg"
+have ffmpeg -version && echo "   already here" || fetch_ffmpeg
+
+say "whisper-cli"
+have whisper-cli --help && echo "   already here" || build_whisper
 
 say "done"
 du -sh "$OUT" | sed 's/^/   /'
