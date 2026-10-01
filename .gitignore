@@ -12,3 +12,6 @@ src-tauri/icons/ios
 # Fetched or built by scripts/fetch-tools.sh; 88 MB, not source.
 src-tauri/binaries
 build
+
+# Written by scripts/release.sh, uploaded to the release, then thrown away.
+latest.json
