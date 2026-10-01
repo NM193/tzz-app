@@ -8,12 +8,16 @@
 # repo, and its password lives in the Keychain -- which is the only arrangement
 # where having a password on the key means anything. Neither is ever printed.
 #
-# Made once, and never again:
+# The key in use has no password, so there is nothing to remember and nothing
+# interactive in a release. A replacement is made like this -- and its public
+# half then has to go into src-tauri/tauri.conf.json -> plugins.updater.pubkey,
+# because the app trusts that one key and no other:
 #
-#   npx tauri signer generate -w ~/.tauri/tzz.key
-#   security add-generic-password -a "$USER" -s tzz-signing -U -w
-#   # then the public half of the key goes in
-#   # src-tauri/tauri.conf.json -> plugins.updater.pubkey
+#   npx tauri signer generate -w ~/.tauri/tzz.key -p "" -f --ci
+#
+# A key WITH a password works too: the first release asks for it once and keeps
+# it in the Keychain. It is a password on a file that already sits behind your
+# login, guarding updates to an app on two Macs, so it buys little.
 #
 # Only Apple Silicon is built, because the ffmpeg this app carries is arm64.
 
@@ -40,16 +44,31 @@ if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
   export TAURI_SIGNING_PRIVATE_KEY="$(cat "$key")"
 fi
 
-# An empty password is a real answer: a key can be made without one.
+# A key may have no password at all, and nothing in the file says which. So
+# this signs a throwaway file with an empty one and believes the answer -- it
+# is a second of certainty instead of a guess that surfaces as a failed build.
+#
+# When the key does want a password, the first release asks for it rather than
+# printing the command that would. `security` does the asking, so the password
+# goes from the terminal into the Keychain and through nothing in between: not
+# this script, not the shell history, not a shell profile.
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
-  if ! security find-generic-password -s tzz-signing >/dev/null 2>&1; then
-    echo "The key's password is not in the Keychain. Put it there, once:"
+  probe="$(mktemp)"
+  echo probe > "$probe"
+  if npx tauri signer sign -f "$key" -p "" "$probe" > /dev/null 2>&1; then
+    export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
+  elif security find-generic-password -s tzz-signing > /dev/null 2>&1; then
+    export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(security find-generic-password -s tzz-signing -w)"
+  elif [ -t 0 ]; then
+    echo "The key has a password. Once, for the Keychain:"
+    security add-generic-password -a "$USER" -s tzz-signing -U -w || exit 1
+    export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(security find-generic-password -s tzz-signing -w)"
+  else
+    echo "The key has a password and there is no terminal to ask on. Once, by hand:"
     echo "  security add-generic-password -a \"\$USER\" -s tzz-signing -U -w"
-    echo
-    echo "It will ask for the password you set when you generated the key."
     exit 1
   fi
-  export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(security find-generic-password -s tzz-signing -w)"
+  rm -f "$probe" "$probe.sig"
 fi
 
 if ! python3 -c 'import json,sys; sys.exit(0 if json.load(open("src-tauri/tauri.conf.json"))["plugins"]["updater"]["pubkey"] else 1)'; then

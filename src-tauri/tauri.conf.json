@@ -57,7 +57,7 @@
       "endpoints": [
         "https://github.com/NM193/tzz-app/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdENjBCNkIzNzU4NTU2QUUKUldTdVZvVjFzN1pnZlFSUU94ZFNsNXF3VnMzRU1JcHlGcUtLaFRGVm5OQmhUaG1UYlJRMlVjWWgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZDQjc3RDA1MkNBM0E4QUUKUldTdXFLTXNCWDIzYlB3RXkyWTNKbm5JV3VydDZ1TWhUUXoxRUhTM2c5Ty9Nc3JtckZqeFVaR0YK",
       "windows": {
         "installMode": "passive"
       }
