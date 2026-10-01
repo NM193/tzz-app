@@ -49,6 +49,18 @@
       "binaries/yt-dlp",
       "binaries/ffmpeg",
       "binaries/whisper-cli"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/NM193/tzz-app/releases/latest/download/latest.json"
+      ],
+      "pubkey": "",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

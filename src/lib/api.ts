@@ -353,3 +353,13 @@ export function onModelProgress(
     handler(event.payload.id, event.payload.percent),
   );
 }
+
+/**
+ * Open the page where BlackHole is distributed.
+ *
+ * The app cannot install it -- it is a driver, it needs an administrator, and
+ * its authors hand out the installer through a form on their own site.
+ */
+export function openBlackholePage(): Promise<void> {
+  return invoke("open_blackhole_page");
+}

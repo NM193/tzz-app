@@ -23,6 +23,7 @@ import { LibraryView } from "./components/LibraryView";
 import { RecordView } from "./components/RecordView";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar, type View } from "./components/Sidebar";
+import { UpdateNotice } from "./components/UpdateNotice";
 import { LibraryControls } from "./components/LibraryControls";
 import { PLAYLIST_LIMIT } from "./lib/queue";
 import { ReaderControls } from "./components/ReaderControls";
@@ -302,6 +303,7 @@ export default function App() {
       </Sidebar>
 
       <main className="stage">
+        <UpdateNotice />
         {view === "convert" && (
           <ConvertView
             settings={settings}

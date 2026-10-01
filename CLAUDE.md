@@ -141,13 +141,23 @@ script once on a fresh clone, before `npm run build`.
 - **The Whisper model cannot travel** -- the one worth having is 1.5 GB. The
   Settings screen offers three and fetches one (`services/model.rs`).
 - **BlackHole still has to be installed by hand.** Its GitHub releases carry no
-  files; the installer is behind a form on the authors' site. Only needed to
-  record the Mac's own sound.
+  files; the installer is behind a form on the authors' site. Record notices
+  when no loopback device exists and offers the page; the URL lives in Rust, so
+  nothing on screen can decide where the app sends you. Only needed to record
+  the Mac's own sound.
 - The app is unsigned, so the first open needs right-click -> Open.
 
-Still to do: the updater. See
-`docs/superpowers/specs/2026-09-29-updating-and-giving-it-away.md`, which is
-waiting on one decision -- GitHub public, or Vercel with a private repo.
+**Updates come from GitHub Releases.** `scripts/release.sh <version> "notes"`
+sets the version, builds, signs, writes the `latest.json` the app reads, and
+runs `gh release create`. `UpdateNotice` asks once at launch and never again
+while the app is open: an update that interrupts an hour-long transcription to
+announce itself is worse than one that waits until tomorrow. Only
+`darwin-aarch64` is published, because the bundled ffmpeg is arm64.
+
+Two things are the owner's alone, and the code must never do either: the
+signing key (`npx tauri signer generate` -- only its public half belongs in
+`plugins.updater.pubkey`) and creating the repo, which has to be public for
+downloads to work without a token.
 
 ## What this is for
 The point is not to answer questions about a lecture -- **NotebookLM does that

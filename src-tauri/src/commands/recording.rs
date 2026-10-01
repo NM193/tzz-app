@@ -44,3 +44,18 @@ pub fn save_recording(temp_path: String, destination: String) -> Result<String, 
     let saved = recorder::save(&PathBuf::from(temp_path), &PathBuf::from(destination))?;
     Ok(saved.to_string_lossy().into_owned())
 }
+
+/// Open the page where BlackHole is distributed.
+///
+/// The app cannot install it: it is an audio driver, it needs an
+/// administrator, and its authors hand out the installer through a form on
+/// their own site rather than as a file anyone can fetch. So this opens their
+/// page and she does the rest. The address is here rather than in the window
+/// so that nothing on screen can decide where the app sends you.
+#[tauri::command]
+pub fn open_blackhole_page(app: AppHandle) -> Result<(), String> {
+    tauri_plugin_opener::open_url("https://existential.audio/blackhole/", None::<&str>)
+        .map_err(|e| format!("Could not open the page: {e}"))?;
+    let _ = app;
+    Ok(())
+}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { revealInFileManager } from "../lib/api";
+import { openBlackholePage, revealInFileManager } from "../lib/api";
 import { fileItem } from "../lib/queue";
 import type { Jobs } from "../lib/useJobs";
 import { clock, type Recorder } from "../lib/useRecorder";
@@ -16,6 +16,11 @@ export function RecordView({ recorder, jobs }: Props) {
   const lit = Math.round(recorder.level * SEGMENTS);
   // One at a time: the player is mounted for whichever recording is playing.
   const [playing, setPlaying] = useState<string | null>(null);
+  // Without it there is nothing to record the Mac's own sound from: macOS
+  // ships no loopback device, so the list holds microphones and nothing else.
+  const noLoopback =
+    recorder.inputs.length > 0 &&
+    !recorder.inputs.some((input) => /blackhole|loopback|soundflower/i.test(input.name));
 
   return (
     <>
@@ -98,6 +103,17 @@ export function RecordView({ recorder, jobs }: Props) {
           />
         ))}
       </div>
+
+      {noLoopback && (
+        <p className="notice">
+          Only microphones here. Recording what the Mac itself plays needs BlackHole,
+          a small audio driver — it is installed by hand, with a password, because
+          that is what a driver needs.{" "}
+          <button type="button" className="icon-button" onClick={() => void openBlackholePage()}>
+            Get BlackHole
+          </button>
+        </p>
+      )}
 
       {recorder.routedTo && (
         <p className="notice">Sound is going through {recorder.routedTo} while recording.</p>

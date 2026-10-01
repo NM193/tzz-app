@@ -8,6 +8,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             services::tray::build(app.handle())?;
             // The frontend turns the glass on if that is what was saved.
@@ -45,6 +47,7 @@ pub fn run() {
             commands::recording::set_second_input,
             commands::recording::toggle_recording,
             commands::recording::save_recording,
+            commands::recording::open_blackhole_page,
         ])
         .build(tauri::generate_context!())
         .expect("failed to start the app")
