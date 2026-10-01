@@ -106,7 +106,8 @@ pub fn toggle(app: &AppHandle) {
         }
     } else {
         let index = selected_input(app).unwrap_or(0);
-        match recorder::start(app, &state, index, &recording_temp_dir()) {
+        let second = second_input(app);
+        match recorder::start(app, &state, index, second, &recording_temp_dir()) {
             Ok(()) => {
                 route_output_for(app, index);
                 let _ = app.emit("recording://started", index);
@@ -223,6 +224,11 @@ pub fn set_input(app: &AppHandle, index: u32) {
     if let Ok(mut selected) = state.selected_input.lock() {
         *selected = Some(index);
     }
+}
+
+/// The input mixed into the first, when the window has asked for one.
+fn second_input(app: &AppHandle) -> Option<u32> {
+    app.state::<RecorderState>().second_input.lock().ok().and_then(|slot| *slot)
 }
 
 fn selected_input(app: &AppHandle) -> Option<u32> {

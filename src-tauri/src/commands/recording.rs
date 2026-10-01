@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use crate::services::recorder::{self, AudioInput};
 use crate::services::tray;
@@ -16,6 +16,15 @@ pub fn list_audio_inputs(app: AppHandle) -> Result<Vec<AudioInput>, String> {
     // Devices may have appeared since the menu was built.
     tray::refresh(&app);
     Ok(inputs)
+}
+
+/// The input mixed into the first, or none. Chosen in the window; the menu
+/// bar icon only ever picks the main one.
+#[tauri::command]
+pub fn set_second_input(app: AppHandle, index: Option<u32>) {
+    if let Ok(mut slot) = app.state::<recorder::RecorderState>().second_input.lock() {
+        *slot = index;
+    }
 }
 
 #[tauri::command]

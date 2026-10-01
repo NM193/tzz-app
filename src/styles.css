@@ -2108,3 +2108,98 @@ mark {
   padding: 0.4375rem 0.875rem;
   font-size: 0.8125rem;
 }
+
+/* ---------- playing a file ------------------------------------------------ */
+
+/*
+  Sits inside the row it belongs to, under the line, indented to clear the
+  number so it lines up with the title above it.
+*/
+.player {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0 0 1rem 3.5rem;
+}
+
+.player__play {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background: none;
+  color: var(--bone);
+  transition:
+    border-color 0.2s,
+    color 0.2s;
+}
+
+.player__play:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/*
+  The track is drawn with a gradient rather than a filled pseudo-element, so
+  the played part follows the thumb without a second box to keep in step.
+*/
+.player__scrub {
+  flex: 1;
+  min-width: 0;
+  height: 1rem;
+  margin: 0;
+  appearance: none;
+  background: none;
+  cursor: pointer;
+}
+
+.player__scrub::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--played),
+    var(--line-2) var(--played)
+  );
+}
+
+.player__scrub::-webkit-slider-thumb {
+  appearance: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-top: -0.25rem;
+  border-radius: 50%;
+  background: var(--bone);
+}
+
+.player__scrub:focus-visible::-webkit-slider-thumb {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.player__time {
+  flex: none;
+  font: 500 0.6875rem var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: var(--bone);
+}
+
+.player__time em {
+  font-style: normal;
+  color: var(--caption);
+}
+
+.player__time em::before {
+  content: " / ";
+}
+
+/* Between the two input pickers: what the recording is made of. */
+.studio__plus {
+  flex: none;
+  font: 500 0.8125rem var(--font-mono);
+  color: var(--caption);
+}

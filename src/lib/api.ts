@@ -63,6 +63,8 @@ export type JobRequest = {
   readScreen: boolean;
   /** Keep the video file instead of only the MP3. */
   keepVideo: boolean;
+  /** A name to use instead of the one the site reports. */
+  title: string | null;
 };
 
 export type LocalFileRequest = {
@@ -180,6 +182,14 @@ export function listAudioInputs(): Promise<AudioInput[]> {
 
 export function setAudioInput(index: number): Promise<void> {
   return invoke("set_audio_input", { index });
+}
+
+/**
+ * A second input mixed into the first -- the machine's sound and your voice.
+ * null records one input only.
+ */
+export function setSecondInput(index: number | null): Promise<void> {
+  return invoke("set_second_input", { index });
 }
 
 /** Starts if idle, stops if recording. The outcome arrives as an event. */

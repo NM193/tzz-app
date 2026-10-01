@@ -49,6 +49,9 @@ pub struct JobRequest {
     pub read_screen: Option<bool>,
     /// Keep the downloaded video instead of deleting it after reading.
     pub keep_video: Option<bool>,
+    /// A name to use instead of the one the site reports. Some players carry
+    /// no title worth having -- a Wistia lesson comes back as "cuku29nr8.mp4".
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -170,13 +173,21 @@ async fn run_job_inner(app: &AppHandle, request: JobRequest) -> Result<JobResult
     let meta = ytdlp::probe(&url).await?;
     cancel::check()?;
 
-    let job_dir = job_folder(&out_dir, &meta.title, &meta.id)?;
+    let title = request
+        .title
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .unwrap_or(&meta.title)
+        .to_string();
+
+    let job_dir = job_folder(&out_dir, &title, &meta.id)?;
 
     // The audio call is also what fetches the captions, and Whisper needs the
     // file, so a transcript pulls the audio in even when the MP3 is unwanted.
     // It is deleted at the end in that case rather than never fetched.
     let output = if want_audio || request.want_transcript {
-        ytdlp::emit(&app, ProgressEvent::stage("downloading", Some(meta.title.clone())));
+        ytdlp::emit(&app, ProgressEvent::stage("downloading", Some(title.clone())));
         Some(
             ytdlp::download_audio(
                 &app,
@@ -212,7 +223,9 @@ async fn run_job_inner(app: &AppHandle, request: JobRequest) -> Result<JobResult
     let mut result_transcript: Option<Transcript> = None;
 
     if let (true, Some(output)) = (request.want_transcript, &output) {
-        match build_transcript(&app, output, &request, &meta, &url, &screens, &mut warnings).await {
+        match build_transcript(&app, output, &request, &meta, &title, &url, &screens, &mut warnings)
+            .await
+        {
             Ok(Some(text)) => result_transcript = Some(text),
             Ok(None) => {}
             Err(message) => warnings.push(message),
@@ -240,7 +253,7 @@ async fn run_job_inner(app: &AppHandle, request: JobRequest) -> Result<JobResult
     ytdlp::emit(&app, ProgressEvent::stage("done", None));
 
     Ok(JobResult {
-        title: meta.title,
+        title,
         folder: job_dir.to_string_lossy().into_owned(),
         audio_path,
         video_path: video_path.map(|p| p.to_string_lossy().into_owned()),
@@ -252,11 +265,13 @@ async fn run_job_inner(app: &AppHandle, request: JobRequest) -> Result<JobResult
 /// Captions first (instant, free); whisper.cpp only when there are none.
 ///
 /// Both paths hand back SRT, so timings survive and there is one formatter.
+#[allow(clippy::too_many_arguments)]
 async fn build_transcript(
     app: &AppHandle,
     output: &ytdlp::DownloadOutput,
     request: &JobRequest,
     meta: &VideoMeta,
+    title: &str,
     url: &str,
     screens: &[Screen],
     warnings: &mut Vec<String>,
@@ -308,7 +323,7 @@ async fn build_transcript(
         &output.audio_path.with_extension("pdf"),
         request.transcript_format.as_deref(),
         &TranscriptHeader {
-            title: &meta.title,
+            title,
             url,
             uploader: meta.uploader.as_deref(),
             duration_seconds: meta.duration_seconds,

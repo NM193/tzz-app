@@ -40,6 +40,7 @@ pub fn run() {
             commands::window::set_glass,
             commands::recording::list_audio_inputs,
             commands::recording::set_audio_input,
+            commands::recording::set_second_input,
             commands::recording::toggle_recording,
             commands::recording::save_recording,
         ])

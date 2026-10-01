@@ -6,6 +6,7 @@ import {
   onRecording,
   saveRecording,
   setAudioInput,
+  setSecondInput,
   toggleRecording,
   type AudioInput,
 } from "./api";
@@ -40,6 +41,7 @@ type Handlers = {
 export function useRecorder({ onSaved, onError }: Handlers) {
   const [inputs, setInputs] = useState<AudioInput[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
+  const [second, setSecond] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
@@ -68,6 +70,18 @@ export function useRecorder({ onSaved, onError }: Handlers) {
   useEffect(() => {
     if (selected !== null) void setAudioInput(selected).catch(() => {});
   }, [selected]);
+
+  // Recording the same device twice would double it, not add anything.
+  useEffect(() => {
+    const paired = second === selected ? null : second;
+    if (paired !== second) setSecond(paired);
+    void setSecondInput(paired).catch(() => {});
+  }, [second, selected]);
+
+  // A device that has been unplugged cannot stay chosen.
+  useEffect(() => {
+    if (second !== null && !inputs.some((input) => input.index === second)) setSecond(null);
+  }, [inputs, second]);
 
   useEffect(() => {
     const unlisten = onRecording({
@@ -129,6 +143,8 @@ export function useRecorder({ onSaved, onError }: Handlers) {
     inputs,
     selected,
     select: setSelected,
+    second,
+    selectSecond: setSecond,
     refreshInputs,
     recording,
     elapsed,

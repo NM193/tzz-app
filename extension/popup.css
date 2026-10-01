@@ -1,0 +1,105 @@
+/*
+  The app's own language, so the two do not look like strangers: one accent
+  over a warm near-black, hairlines, a serif only for the name.
+*/
+:root {
+  --bg: #181616;
+  --bone: #fffddc;
+  --muted-2: #bdb5ac;
+  --caption: #8a827b;
+  --line: #2a2626;
+  --line-2: #3a3533;
+  --accent: #f7ab29;
+  --sans: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 360px;
+  margin: 0;
+  padding: 14px;
+  background: var(--bg);
+  color: var(--bone);
+  font: 400 13px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+header b { font: 400 20px/1 Georgia, serif; }
+
+header span {
+  font: 500 9px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--caption);
+}
+
+.note {
+  margin: 10px 0;
+  font-size: 12px;
+  color: var(--caption);
+}
+
+.actions { display: flex; gap: 6px; margin: 10px 0; }
+.actions--end { justify-content: flex-end; }
+
+button {
+  padding: 7px 12px;
+  border-radius: 7px;
+  font: 500 12px var(--sans);
+  cursor: pointer;
+}
+
+.cta {
+  border: 1px solid var(--bone);
+  background: var(--bone);
+  color: var(--bg);
+}
+
+.cta:disabled { opacity: 0.35; cursor: default; }
+
+.ghost {
+  border: 1px solid var(--line-2);
+  background: none;
+  color: var(--muted-2);
+}
+
+.ghost:hover { color: var(--bone); }
+
+ol {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+li {
+  display: flex;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+li i {
+  flex: none;
+  font: 500 10px/1.6 var(--mono);
+  font-style: normal;
+  color: var(--caption);
+}
+
+li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

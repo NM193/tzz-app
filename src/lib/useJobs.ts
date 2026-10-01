@@ -85,6 +85,7 @@ export function useJobs(settings: Settings) {
       transcriptFormat: s.transcriptFormat,
       readScreen: s.readScreen,
       keepVideo: s.keepVideo,
+      title: item.named ? item.label : null,
     });
   }
 

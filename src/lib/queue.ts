@@ -11,34 +11,55 @@ export type QueueItem = {
   /** The link, or the absolute file path. What the command receives. */
   target: string;
   status: QueueStatus;
+  /** The label came from the paste, not from the site. */
+  named?: boolean;
   result?: JobResult;
   error?: string;
+};
+
+export type Pasted = {
+  url: string;
+  /** A name given in the paste, for players that carry none worth having. */
+  title?: string;
 };
 
 /**
  * One link per line. Blanks, duplicates and anything that is not a link are
  * dropped, so a pasted page of text cannot turn into a queue of nonsense.
+ *
+ * A line may name what it is: `Lesson three | https://…`. Some players report
+ * no title worth keeping -- a Wistia lesson comes back as "cuku29nr8.mp4" --
+ * and a course of twenty of those is unusable. Whatever collected the links
+ * knows their names, so it can say them here.
  */
-export function parseUrlList(text: string): string[] {
+export function parseUrlList(text: string): Pasted[] {
   const seen = new Set<string>();
+
   return text
     .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("http://") || line.startsWith("https://"))
-    .filter((line) => {
-      if (seen.has(line)) return false;
-      seen.add(line);
+    .map((line) => {
+      const at = line.indexOf("|");
+      const title = at === -1 ? "" : line.slice(0, at).trim();
+      const url = (at === -1 ? line : line.slice(at + 1)).trim();
+      return title ? { url, title } : { url };
+    })
+    .filter(({ url }) => url.startsWith("http://") || url.startsWith("https://"))
+    .filter(({ url }) => {
+      if (seen.has(url)) return false;
+      seen.add(url);
       return true;
     });
 }
 
-export function urlItem(url: string, label?: string): QueueItem {
+export function urlItem(url: string, label?: string, named?: boolean): QueueItem {
   return {
     id: crypto.randomUUID(),
     kind: "url",
     label: label ?? url,
     target: url,
     status: "waiting",
+    /** The label was given rather than read, so the job should use it. */
+    named,
   };
 }
 
@@ -59,8 +80,8 @@ export type PendingLink = {
   playlist?: boolean;
 };
 
-export function pendingLink(url: string): PendingLink {
-  return { id: crypto.randomUUID(), url, title: null, failed: false };
+export function pendingLink(url: string, title?: string): PendingLink {
+  return { id: crypto.randomUUID(), url, title: title ?? null, failed: false };
 }
 
 /** Mirrors PLAYLIST_LIMIT in src-tauri/src/services/ytdlp.rs. */

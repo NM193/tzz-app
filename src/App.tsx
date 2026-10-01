@@ -6,7 +6,14 @@ import {
   setGlass,
   type DependencyStatus,
 } from "./lib/api";
-import { fileItem, isPlaylist, knownLink, pendingLink, type PendingLink } from "./lib/queue";
+import {
+  fileItem,
+  isPlaylist,
+  knownLink,
+  pendingLink,
+  type Pasted,
+  type PendingLink,
+} from "./lib/queue";
 import { errorMessage, probePlaylist, probeVideo } from "./lib/api";
 import { loadSettings, saveSettings, type Settings } from "./lib/settings";
 import { STAGE_LABEL, useJobs } from "./lib/useJobs";
@@ -180,18 +187,23 @@ export default function App() {
    * A pasted link becomes a pill straight away and reads its own title in the
    * background. A playlist link becomes one pill that turns into all of them.
    */
-  function addLinks(urls: string[]) {
+  function addLinks(pasted: Pasted[]) {
     const known = new Set(linksRef.current.map((l) => l.url));
-    const fresh = urls
-      .filter((url) => !known.has(url))
-      .map((url) => (isPlaylist(url) ? { ...pendingLink(url), playlist: true } : pendingLink(url)));
+    const fresh = pasted
+      .filter(({ url }) => !known.has(url))
+      .map(({ url, title }) =>
+        isPlaylist(url)
+          ? { ...pendingLink(url), playlist: true }
+          : pendingLink(url, title),
+      );
 
     if (fresh.length === 0) return;
     setLinks((prev) => [...prev, ...fresh]);
 
     for (const link of fresh) {
       if (link.playlist) void unpack(link);
-      else void readTitle(link);
+      // A name given in the paste is the one we keep; nothing to read.
+      else if (!link.title) void readTitle(link);
     }
   }
 

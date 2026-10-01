@@ -124,11 +124,17 @@ These were bugs. The comments in the code say the same; this is the index.
   what it wrote. One job runs at a time, so this is a global, on purpose.
 
 ## Moving to another Mac
-No updater and no signing: this app lives on one machine. To move it, copy
-the folder (or `git clone`), then `brew install yt-dlp ffmpeg whisper-cpp`,
+There is no updater and no signing yet. To move the app, copy the folder (or
+`git clone`), then `brew install yt-dlp ffmpeg whisper-cpp`,
 `xcode-select --install` for `swiftc`, install BlackHole for system audio,
 drop a Whisper `ggml-*.bin` model where Settings can find it, and run
 `npm run install:app`.
+
+**This is being changed.** The owner wants the app to update itself and to run
+on a second Mac; what that takes, and the one decision still open, is in
+`docs/superpowers/specs/2026-09-29-updating-and-giving-it-away.md`. The short
+of it: the easy half is the updater, the hard half is that the app finds
+`yt-dlp`, `ffmpeg` and `whisper-cli` on the system rather than carrying them.
 
 ## What this is for
 The point is not to answer questions about a lecture -- **NotebookLM does that

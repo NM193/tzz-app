@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { revealInFileManager } from "../lib/api";
 import { fileItem } from "../lib/queue";
 import type { Jobs } from "../lib/useJobs";
 import { clock, type Recorder } from "../lib/useRecorder";
+import { Player } from "./Player";
 
 const SEGMENTS = 40;
 
@@ -12,13 +14,16 @@ type Props = {
 
 export function RecordView({ recorder, jobs }: Props) {
   const lit = Math.round(recorder.level * SEGMENTS);
+  // One at a time: the player is mounted for whichever recording is playing.
+  const [playing, setPlaying] = useState<string | null>(null);
 
   return (
     <>
       <h1 className="title">Record</h1>
       <p className="lede">
-        A call, a live lecture, your own voice. The recording joins the queue as soon
-        as you name it. The menu bar icon starts and stops it too.
+        A call, a live lecture, your own voice. Pick two inputs and both are
+        recorded into one file -- the machine's sound and you. The recording joins
+        the queue as soon as you name it, and the menu bar icon starts it too.
       </p>
 
       <div className={`studio ${recorder.recording ? "studio--live" : ""}`}>
@@ -27,19 +32,46 @@ export function RecordView({ recorder, jobs }: Props) {
           {recorder.inputs.length === 0 ? (
             <span className="row__state">No audio input found</span>
           ) : (
-            <select
-              className="ghost"
-              value={recorder.selected ?? ""}
-              disabled={recorder.recording}
-              onMouseDown={recorder.refreshInputs}
-              onChange={(event) => recorder.select(Number(event.target.value))}
-            >
-              {recorder.inputs.map((input) => (
-                <option key={input.index} value={input.index}>
-                  {input.name}
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                className="ghost"
+                aria-label="Input"
+                value={recorder.selected ?? ""}
+                disabled={recorder.recording}
+                onMouseDown={recorder.refreshInputs}
+                onChange={(event) => recorder.select(Number(event.target.value))}
+              >
+                {recorder.inputs.map((input) => (
+                  <option key={input.index} value={input.index}>
+                    {input.name}
+                  </option>
+                ))}
+              </select>
+
+              <span className="studio__plus" aria-hidden="true">
+                +
+              </span>
+
+              <select
+                className="ghost"
+                aria-label="Second input"
+                value={recorder.second ?? ""}
+                disabled={recorder.recording}
+                onMouseDown={recorder.refreshInputs}
+                onChange={(event) =>
+                  recorder.selectSecond(event.target.value === "" ? null : Number(event.target.value))
+                }
+              >
+                <option value="">Nothing else</option>
+                {recorder.inputs
+                  .filter((input) => input.index !== recorder.selected)
+                  .map((input) => (
+                    <option key={input.index} value={input.index}>
+                      {input.name}
+                    </option>
+                  ))}
+              </select>
+            </>
           )}
           <button
             type="button"
@@ -85,6 +117,13 @@ export function RecordView({ recorder, jobs }: Props) {
                     <button
                       type="button"
                       className="icon-button"
+                      onClick={() => setPlaying(playing === path ? null : path)}
+                    >
+                      {playing === path ? "Stop" : "Play"}
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
                       onClick={() => revealInFileManager(path)}
                     >
                       Folder
@@ -98,6 +137,10 @@ export function RecordView({ recorder, jobs }: Props) {
                     </button>
                   </span>
                 </div>
+
+                {playing === path && (
+                  <Player key={path} path={path} onClose={() => setPlaying(null)} />
+                )}
               </li>
             ))}
           </ol>

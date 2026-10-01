@@ -8,6 +8,11 @@
 //! loopback device, so `avfoundation` lists the microphone and nothing else.
 //! A virtual driver such as BlackHole simply appears in the same list, which
 //! is why nothing here special-cases it.
+//!
+//! WHY two inputs can be recorded at once: a call is the machine's sound and
+//! your own voice, which are two devices. macOS can be told to combine them
+//! into an Aggregate Device by hand, but ffmpeg will open both and mix them
+//! itself, and nobody should have to visit Audio MIDI Setup to record a call.
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -43,6 +48,8 @@ pub struct Recording {
 pub struct RecorderState {
     pub current: Mutex<Option<Recording>>,
     pub selected_input: Mutex<Option<u32>>,
+    /// A second input mixed into the first, for "the call and me".
+    pub second_input: Mutex<Option<u32>>,
     /// The output device to put back when recording ends.
     pub restore_output: Mutex<Option<u32>>,
 }
@@ -102,10 +109,41 @@ fn parse_inputs(listing: &str) -> Vec<AudioInput> {
     inputs
 }
 
+/// The ffmpeg filter for one input, or for two mixed together.
+///
+/// Mixing two devices is not just `amix`. They are different shapes -- a
+/// loopback is stereo, a built-in microphone is mono -- and each runs on its
+/// own clock, which is what makes a mix crackle: the two streams drift apart
+/// and samples are dropped or repeated at the seam. So each input is first
+/// brought to the same shape, and then `aresample=async` is allowed to stretch
+/// it a little to stay in step. `first_pts=0` starts both from zero, because
+/// the devices report whatever their own clock said when they opened.
+///
+/// `normalize=0` keeps both at their own level -- the default halves each,
+/// which turns a quiet voice into nothing. The limiter is what makes that
+/// safe: two loud sources can sum past full scale, and a clipped hour cannot
+/// be repaired afterwards. `ebur128` is last so the meter reads what is
+/// actually being written; `framelog=info` is load-bearing, because `verbose`
+/// logs below ffmpeg's default level and the meter sits dead.
+fn filter_for(second: Option<u32>) -> String {
+    const SHAPE: &str = "aformat=sample_rates=48000:channel_layouts=stereo,\
+                         aresample=async=1:first_pts=0";
+
+    match second {
+        Some(_) => format!(
+            "[0:a]{SHAPE}[a0];[1:a]{SHAPE}[a1];\
+             [a0][a1]amix=inputs=2:duration=longest:normalize=0,\
+             alimiter=limit=0.97,ebur128=framelog=info[a]"
+        ),
+        None => "[0:a]ebur128=framelog=info[a]".to_string(),
+    }
+}
+
 pub fn start(
     app: &AppHandle,
     state: &RecorderState,
     input_index: u32,
+    second_index: Option<u32>,
     temp_dir: &Path,
 ) -> Result<(), String> {
     let mut slot = state.current.lock().map_err(|_| lock_error())?;
@@ -125,13 +163,15 @@ pub fn start(
     let temp_path = temp_dir.join(format!("recording-{stamp}.mp3"));
 
     // stdin stays open: stopping means sending ffmpeg a "q", not killing it.
-    // ebur128 passes the audio through untouched and prints a loudness reading
-    // roughly every 100 ms, which is what the meter draws. `framelog=info` is
-    // load-bearing: `verbose` logs below ffmpeg's default level, so the
-    // readings never appear and the meter sits dead.
-    let mut child = Command::new(ffmpeg)
-        .args(["-f", "avfoundation", "-i", &format!(":{input_index}")])
-        .args(["-af", "ebur128=framelog=info"])
+    let mut command = Command::new(ffmpeg);
+    command.args(["-f", "avfoundation", "-i", &format!(":{input_index}")]);
+    if let Some(second) = second_index {
+        command.args(["-f", "avfoundation", "-i", &format!(":{second}")]);
+    }
+
+    let mut child = command
+        .args(["-filter_complex", &filter_for(second_index)])
+        .args(["-map", "[a]"])
         .args(["-c:a", "libmp3lame", "-q:a", "0", "-y"])
         .arg(&temp_path)
         .stdin(Stdio::piped())
@@ -279,6 +319,23 @@ mod tests {
                 AudioInput { index: 1, name: "BlackHole 2ch".into() },
             ]
         );
+    }
+
+    #[test]
+    fn one_input_is_passed_through_and_two_are_mixed() {
+        assert_eq!(filter_for(None), "[0:a]ebur128=framelog=info[a]");
+
+        let both = filter_for(Some(1));
+        assert!(both.contains("amix=inputs=2"), "{both}");
+        // Two devices on two clocks drift apart; that is what crackles.
+        assert_eq!(both.matches("aresample=async=1").count(), 2, "{both}");
+        // A stereo loopback and a mono microphone are different shapes.
+        assert_eq!(both.matches("channel_layouts=stereo").count(), 2, "{both}");
+        // Halving each is what the default does, and a quiet voice disappears.
+        assert!(both.contains("normalize=0"), "{both}");
+        // Two loud sources sum past full scale.
+        assert!(both.contains("alimiter"), "{both}");
+        assert!(both.ends_with("ebur128=framelog=info[a]"), "{both}");
     }
 
     #[test]

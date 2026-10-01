@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { errorMessage, openOutputFolder, revealInFileManager } from "../lib/api";
-import { fileItem, urlItem, type PendingLink } from "../lib/queue";
+import { fileItem, urlItem, type Pasted, type PendingLink } from "../lib/queue";
 import { libraryLabel, type Settings } from "../lib/settings";
 import { STAGE_LABEL, type Jobs } from "../lib/useJobs";
 import { Check } from "./Controls";
@@ -17,7 +17,7 @@ type Props = {
   update: (patch: Partial<Settings>) => void;
   jobs: Jobs;
   links: PendingLink[];
-  onAddLinks: (urls: string[]) => void;
+  onAddLinks: (pasted: Pasted[]) => void;
   onRemoveLink: (id: string) => void;
   onClearLinks: () => void;
   dragging: boolean;
@@ -68,7 +68,7 @@ export function ConvertView({
 
   function start() {
     if (links.length === 0) return;
-    const items = links.map((l) => urlItem(l.url, l.title ?? l.url));
+    const items = links.map((l) => urlItem(l.url, l.title ?? l.url, l.title !== null));
     onClearLinks();
     void jobs.enqueue(items);
   }

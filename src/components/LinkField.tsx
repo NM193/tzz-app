@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
-import { parseUrlList, shortenUrl, type PendingLink } from "../lib/queue";
+import { parseUrlList, shortenUrl, type Pasted, type PendingLink } from "../lib/queue";
 import { CloseIcon } from "./Icons";
 
 type Props = {
   links: PendingLink[];
-  onAdd: (urls: string[]) => void;
+  onAdd: (pasted: Pasted[]) => void;
   onRemove: (id: string) => void;
   disabled: boolean;
 };
@@ -20,9 +20,9 @@ export function LinkField({ links, onAdd, onRemove, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   function commit(text: string) {
-    const urls = parseUrlList(text);
-    if (urls.length > 0) {
-      onAdd(urls);
+    const pasted = parseUrlList(text);
+    if (pasted.length > 0) {
+      onAdd(pasted);
       setDraft("");
     }
   }
@@ -67,7 +67,7 @@ export function LinkField({ links, onAdd, onRemove, disabled }: Props) {
         ref={inputRef}
         type="text"
         value={draft}
-        placeholder={links.length === 0 ? "Paste YouTube links, one or many" : ""}
+        placeholder={links.length === 0 ? "Paste links — one per line, or “Name | link”" : ""}
         spellCheck={false}
         autoComplete="off"
         disabled={disabled}
