@@ -10,7 +10,7 @@ use crate::services::binaries::{self, DependencyStatus};
 use crate::services::cancel;
 use crate::services::combine::{self, Section};
 use crate::services::pdf;
-use crate::services::document;
+use crate::services::model::{self, Model};
 use crate::services::screen;
 use crate::services::thumb;
 use crate::services::transcript::{self, Screen, Transcript, TranscriptHeader};
@@ -132,6 +132,18 @@ pub fn check_dependencies() -> Vec<DependencyStatus> {
 pub async fn probe_video(url: String) -> Result<VideoMeta, String> {
     let url = normalize_url(&url)?;
     ytdlp::probe(&url).await
+}
+
+/// Every Whisper model offered, and whether it is already here.
+#[tauri::command]
+pub fn whisper_models() -> Vec<Model> {
+    model::catalogue()
+}
+
+/// Fetch one. Progress arrives on `model://progress`.
+#[tauri::command]
+pub async fn download_whisper_model(app: AppHandle, id: String) -> Result<String, String> {
+    model::download(&app, &id).await
 }
 
 /// What is in a playlist, without fetching any of it.

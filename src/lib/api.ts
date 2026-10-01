@@ -325,3 +325,31 @@ export function saveNote(
 ): Promise<string | null> {
   return invoke("save_note", { transcript, title, chapter, body });
 }
+
+export type WhisperModel = {
+  id: string;
+  name: string;
+  /** What it costs you, in one line. */
+  note: string;
+  bytes: number;
+  installed: boolean;
+};
+
+/** Every Whisper model offered, and whether it is already on this Mac. */
+export function whisperModels(): Promise<WhisperModel[]> {
+  return invoke("whisper_models");
+}
+
+/** Fetch one. It lands where the app already looks for models. */
+export function downloadWhisperModel(id: string): Promise<string> {
+  return invoke("download_whisper_model", { id });
+}
+
+/** How far along a model download is. */
+export function onModelProgress(
+  handler: (id: string, percent: number) => void,
+): Promise<UnlistenFn> {
+  return listen<{ id: string; percent: number }>("model://progress", (event) =>
+    handler(event.payload.id, event.payload.percent),
+  );
+}

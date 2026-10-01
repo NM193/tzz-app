@@ -2203,3 +2203,51 @@ mark {
   font: 500 0.8125rem var(--font-mono);
   color: var(--caption);
 }
+
+/* ---------- getting a Whisper model --------------------------------------- */
+
+.models {
+  display: grid;
+  gap: 0.125rem;
+  margin: 0.25rem 0 1rem;
+}
+
+.model {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.model__text b {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  font-weight: 500;
+}
+
+.model__text b em {
+  font: 500 0.625rem var(--font-mono);
+  font-style: normal;
+  letter-spacing: 0.08em;
+  color: var(--caption);
+}
+
+.model__text span {
+  display: block;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--caption);
+}
+
+.model__progress {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex: none;
+  font: 500 0.6875rem var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-2);
+}

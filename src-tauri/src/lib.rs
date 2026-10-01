@@ -26,6 +26,8 @@ pub fn run() {
             commands::media::default_whisper_model,
             commands::media::probe_video,
             commands::media::probe_playlist,
+            commands::media::whisper_models,
+            commands::media::download_whisper_model,
             commands::media::run_job,
             commands::media::transcribe_file,
             commands::media::cancel_job,

@@ -4,6 +4,11 @@
 //! login shell PATH, so /opt/homebrew/bin is missing and a plain
 //! `Command::new("yt-dlp")` fails only in the bundled build -- never in `tauri dev`.
 //! We therefore probe well-known install locations before falling back to PATH.
+//!
+//! A built app carries its own copies beside its executable (see
+//! `scripts/fetch-tools.sh`), and those come first, so the app works on a Mac
+//! that has never seen Homebrew. During `tauri dev` there is nothing beside the
+//! executable, and the system copies are used as before.
 
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -23,10 +28,21 @@ pub struct DependencyStatus {
     pub path: Option<String>,
 }
 
+/// The copy that travels with the app, if there is one.
+///
+/// Tauri puts a sidecar next to the executable and strips the target triple
+/// from its name, so `yt-dlp-aarch64-apple-darwin` arrives as `yt-dlp`.
+fn beside_the_app(name: &str) -> Option<PathBuf> {
+    let candidate = std::env::current_exe().ok()?.parent()?.join(name);
+    is_executable(&candidate).then_some(candidate)
+}
+
 /// Resolve an executable by name.
 ///
-/// Order: explicit env override -> known install dirs -> PATH.
-/// The env override lets you point at a custom build, e.g. `YT_DLP_PATH=/x/yt-dlp`.
+/// Order: explicit env override -> the app's own copy -> known install dirs ->
+/// PATH. The env override lets you point at a custom build, e.g.
+/// `YT_DLP_PATH=/x/yt-dlp`, and comes first so it can override even the copy
+/// inside the app.
 pub fn resolve(name: &str) -> Option<PathBuf> {
     let env_key = format!("{}_PATH", name.to_uppercase().replace('-', "_"));
     if let Ok(custom) = std::env::var(&env_key) {
@@ -34,6 +50,10 @@ pub fn resolve(name: &str) -> Option<PathBuf> {
         if is_executable(&candidate) {
             return Some(candidate);
         }
+    }
+
+    if let Some(carried) = beside_the_app(name) {
+        return Some(carried);
     }
 
     for dir in COMMON_BIN_DIRS {
@@ -51,6 +71,26 @@ pub fn require(name: &str) -> Result<PathBuf, String> {
     resolve(name).ok_or_else(|| {
         format!("`{name}` not found. Install it with: brew install {name}")
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_apps_own_copy_is_looked_for_beside_the_executable() {
+        // Nothing is beside the test binary, which is the `tauri dev` case.
+        assert!(beside_the_app("yt-dlp").is_none());
+    }
+
+    #[test]
+    fn an_override_wins_over_everything() {
+        // The one escape hatch: a custom build during development.
+        std::env::set_var("FFMPEG_PATH", "/definitely/not/here");
+        // Not executable, so it falls through rather than being believed.
+        assert_ne!(resolve("ffmpeg"), Some(PathBuf::from("/definitely/not/here")));
+        std::env::remove_var("FFMPEG_PATH");
+    }
 }
 
 pub fn status_for(names: &[&str]) -> Vec<DependencyStatus> {

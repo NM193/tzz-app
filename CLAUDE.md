@@ -35,7 +35,8 @@ macOS ties permissions and settings to it.
     kept per chapter · `recorder` ·
     `audio_output` CoreAudio · `tray` the menu bar icon · `cancel` stopping a
     job and deleting what it wrote · `library` reading the output folder ·
-    `thumb` one picture per folder · `glass` the frosted window
+    `thumb` one picture per folder · `glass` the frosted window ·
+    `model` fetching a Whisper model
 - `src-tauri/helpers/ocr.swift` the Vision text reader.
 
 ## Key patterns
@@ -123,18 +124,30 @@ These were bugs. The comments in the code say the same; this is the index.
 - Stopping a job (`services/cancel.rs`) kills its process group and deletes
   what it wrote. One job runs at a time, so this is a global, on purpose.
 
-## Moving to another Mac
-There is no updater and no signing yet. To move the app, copy the folder (or
-`git clone`), then `brew install yt-dlp ffmpeg whisper-cpp`,
-`xcode-select --install` for `swiftc`, install BlackHole for system audio,
-drop a Whisper `ggml-*.bin` model where Settings can find it, and run
-`npm run install:app`.
+## Giving it to someone else
+**The app carries its own tools.** `scripts/fetch-tools.sh` puts `yt-dlp`,
+`ffmpeg` and `whisper-cli` in `src-tauri/binaries/`, and `bundle.externalBin`
+copies them into the `.app`. 88 MB of them, so they are not in git: run the
+script once on a fresh clone, before `npm run build`.
 
-**This is being changed.** The owner wants the app to update itself and to run
-on a second Mac; what that takes, and the one decision still open, is in
-`docs/superpowers/specs/2026-09-29-updating-and-giving-it-away.md`. The short
-of it: the easy half is the updater, the hard half is that the app finds
-`yt-dlp`, `ffmpeg` and `whisper-cli` on the system rather than carrying them.
+- **yt-dlp** and **ffmpeg** are fetched as the portable builds their authors
+  publish. Homebrew's ffmpeg links nineteen Homebrew libraries and its yt-dlp
+  is a shell script pointing into the Cellar; neither can be carried over.
+- **whisper-cli is built from source**, with the libraries, the backends and
+  the Metal shaders inside it. Copying Homebrew's does not work: it loads its
+  backends from a path compiled into it, and `GGML_BACKEND_PATH` can only add
+  one file, so on a Mac without Homebrew it comes up with no CPU and no Metal.
+  `cmake` is needed to build it.
+- **The Whisper model cannot travel** -- the one worth having is 1.5 GB. The
+  Settings screen offers three and fetches one (`services/model.rs`).
+- **BlackHole still has to be installed by hand.** Its GitHub releases carry no
+  files; the installer is behind a form on the authors' site. Only needed to
+  record the Mac's own sound.
+- The app is unsigned, so the first open needs right-click -> Open.
+
+Still to do: the updater. See
+`docs/superpowers/specs/2026-09-29-updating-and-giving-it-away.md`, which is
+waiting on one decision -- GitHub public, or Vercel with a private repo.
 
 ## What this is for
 The point is not to answer questions about a lecture -- **NotebookLM does that
@@ -170,4 +183,5 @@ Not built: Windows support.
 - `npm run build` -- bundle a .app / .dmg
 - `npm run install:app` -- build and replace the copy in /Applications
 - `npm run build:vite` -- typecheck the frontend only
-- `cd src-tauri && cargo test` -- 69 tests, all pure logic
+- `bash scripts/fetch-tools.sh` -- put the external tools inside the app
+- `cd src-tauri && cargo test` -- 97 tests, all pure logic

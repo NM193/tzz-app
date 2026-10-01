@@ -7,6 +7,7 @@ import {
 } from "../lib/api";
 import type { Accent, Aurora, Settings, Surface, Tint } from "../lib/settings";
 import { Segmented, Setting, Switch } from "./Controls";
+import { ModelPicker } from "./ModelPicker";
 
 type Props = {
   settings: Settings;
@@ -188,13 +189,15 @@ export function SettingsView({ settings, update, deps, onError }: Props) {
           title="Whisper model"
           hint={
             settings.whisperModelPath ||
-            "Not set. Lectures without captions get no transcript."
+            "Not set. A lecture without captions gets no transcript until one is here."
           }
         >
           <button type="button" className="ghost ghost--small" onClick={pickModel}>
-            Choose
+            Choose a file
           </button>
         </Setting>
+
+        <ModelPicker onInstalled={(whisperModelPath) => update({ whisperModelPath })} />
       </div>
 
       <div className="section">

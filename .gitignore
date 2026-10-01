@@ -8,3 +8,7 @@ src-tauri/icons/android
 src-tauri/icons/ios
 
 .DS_Store
+
+# Fetched or built by scripts/fetch-tools.sh; 88 MB, not source.
+src-tauri/binaries
+build
