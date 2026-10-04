@@ -145,7 +145,13 @@ script once on a fresh clone, before `npm run build`.
   when no loopback device exists and offers the page; the URL lives in Rust, so
   nothing on screen can decide where the app sends you. Only needed to record
   the Mac's own sound.
-- The app is unsigned, so the first open needs right-click -> Open.
+- **The app is unsigned, and on macOS 15 and later that is not a right-click
+  away.** Apple removed the Control-click override: the first open is refused
+  outright, and the way through is System Settings -> Privacy & Security, where
+  a line about the blocked app appears with **Open Anyway**. Only the first
+  open, and only for a copy that came down through a browser. Writing
+  "right-click -> Open" in the instructions sends someone to a menu item that
+  no longer helps.
 
 **Updates come from GitHub Releases**, out of the public repo `NM193/tzz-app`.
 `scripts/release.sh <version> "notes"` sets the version, builds, signs,
