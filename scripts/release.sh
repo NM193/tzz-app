@@ -2,7 +2,10 @@
 #
 # Cut a release: build the app, sign it, and put it where the app looks.
 #
-#   bash scripts/release.sh 0.2.0 "What changed, in a sentence or two."
+#   bash scripts/release.sh 0.2.0
+#
+# What changed comes from CHANGELOG.md: whatever is under Unreleased becomes
+# this version's notes, on the GitHub release and in the app's update notice.
 #
 # The key is found, not asked for. It lives at ~/.tauri/tzz.key, outside the
 # repo, and its password lives in the Keychain -- which is the only arrangement
@@ -25,10 +28,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 version="${1:-}"
-notes="${2:-A new version.}"
 
 if [ -z "$version" ]; then
-  echo "usage: bash scripts/release.sh <version> [notes]"
+  echo "usage: bash scripts/release.sh <version>"
+  exit 1
+fi
+
+if [ "$#" -gt 1 ]; then
+  echo "The notes come from CHANGELOG.md now: write them under Unreleased there."
   exit 1
 fi
 
@@ -90,6 +97,15 @@ if [ -z "$repo" ]; then
   exit 1
 fi
 
+# What changed. Unreleased in CHANGELOG.md becomes this version here: after the
+# checks above, so a release that cannot start never stamps one, and before the
+# version is written, so the stamp goes into the same commit. A release run
+# again finds its version already stamped and carries on; a version typed by
+# mistake is refused before anything is committed or pushed.
+echo "== notes"
+python3 scripts/changelog.py stamp "$version"
+python3 scripts/changelog.py text "$version" | sed 's/^/   /'
+
 # The version the app reports, and the one an update is compared against.
 python3 - "$version" <<'PY'
 import collections, json, sys
@@ -120,6 +136,8 @@ git tag -f "v$version"
 git push -q origin HEAD
 git push -q -f origin "v$version"
 
+notes="$(python3 scripts/changelog.py markdown "$version")"
+
 # Re-runnable on purpose. A release that got as far as uploading and then fell
 # over -- a bad manifest, a wrong signature -- is mended by running this again,
 # not by deleting it and hoping. The archive and its signature go up together
@@ -148,9 +166,18 @@ if [ -z "$url" ]; then
   exit 1
 fi
 
-python3 - "$version" "$notes" "$url" "$archive" <<'MANIFEST'
+# The same notes twice. `notes` is plain text, because that is all a copy made
+# before the notice read `changes` can show. `changes` is this version and the
+# nine before it, so someone who skipped a few sees what they missed. The
+# updater ignores fields it does not know and hands the whole file to the app.
+# Assigned first, not substituted inline: `set -e` notices a failed assignment
+# and would not notice a failed argument.
+plain="$(python3 scripts/changelog.py text "$version")"
+changes="$(python3 scripts/changelog.py changes "$version")"
+
+python3 - "$version" "$plain" "$changes" "$url" "$archive" <<'MANIFEST'
 import datetime, json, sys
-version, notes, url, archive = sys.argv[1:5]
+version, notes, changes, url, archive = sys.argv[1:6]
 json.dump({
     "version": version,
     "notes": notes,
@@ -162,6 +189,7 @@ json.dump({
             "url": url,
         }
     },
+    "changes": json.loads(changes),
 }, open("latest.json", "w"), indent=2)
 MANIFEST
 
@@ -192,6 +220,21 @@ if ! python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["pl
   exit 1
 fi
 echo "   signature:  matches this build"
+
+# And the notes the notice reads: `changes` has to open with this version, and
+# say something, or the update would be offered with nothing to tell.
+if ! python3 - "$here/latest.json" "$version" <<'NOTES'
+import json, sys
+manifest, version = sys.argv[1:3]
+first = (json.load(open(manifest)).get("changes") or [{}])[0]
+sys.exit(0 if first.get("version") == version
+         and any(first.get(key) for key in ("new", "improved", "fixed")) else 1)
+NOTES
+then
+  echo "   the manifest's changes do not open with $version's notes."
+  exit 1
+fi
+echo "   notes:      $version's open the changes"
 rm -rf "$here"
 
 # And finally the address the app is actually given, once GitHub agrees that
