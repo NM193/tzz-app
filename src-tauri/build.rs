@@ -13,15 +13,26 @@ fn main() {
 /// cannot be found is a feature that silently does nothing.
 fn build_ocr_helper() {
     println!("cargo:rerun-if-changed=helpers/ocr.swift");
+    // `tauri build` sets this from bundle.macOS.minimumSystemVersion, and the
+    // Rust is built for it. swiftc does not read it: left alone, the helper
+    // asks for the macOS of the Mac that built it, and screen text fails on
+    // anything older. Unset -- `tauri dev`, `cargo test` -- nothing changes.
+    println!("cargo:rerun-if-env-changed=MACOSX_DEPLOYMENT_TARGET");
 
     let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR")).join("ocr");
 
-    let status = Command::new("swiftc")
+    let mut swiftc = Command::new("swiftc");
+    swiftc
         .args(["-O", "-o"])
         .arg(&out)
         .arg("helpers/ocr.swift")
-        .args(["-framework", "Vision", "-framework", "AppKit"])
-        .status();
+        .args(["-framework", "Vision", "-framework", "AppKit"]);
+    if let Ok(minimum) = std::env::var("MACOSX_DEPLOYMENT_TARGET") {
+        let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+        let arch = if arch == "aarch64" { "arm64" } else { arch.as_str() };
+        swiftc.arg("-target").arg(format!("{arch}-apple-macos{minimum}"));
+    }
+    let status = swiftc.status();
 
     match status {
         Ok(status) if status.success() => {}
