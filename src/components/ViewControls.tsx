@@ -76,7 +76,7 @@ function Stepper({
   children: ReactNode;
 }) {
   return (
-    <div className={`stepper ${className}`} role="group" aria-label={label} inert={inactive}>
+    <div className={`stepper ${className}`} role="group" aria-label={label} inert={inactive ? "" : undefined}>
       <button
         type="button"
         className="step"

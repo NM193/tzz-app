@@ -89,7 +89,7 @@ export function Sidebar({ view, onNavigate, status, children }: Props) {
 
       <div className="nav" ref={wrap}>
         <span className="nav__pill" ref={pill} aria-hidden="true">
-          <span className="nav__copy" ref={copy} inert>
+          <span className="nav__copy" ref={copy} inert="">
             {rows()}
           </span>
         </span>

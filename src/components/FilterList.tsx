@@ -116,7 +116,7 @@ export function FilterList({ active, counts, onSelect }: Props) {
       <span className="cats__hover" ref={hover} aria-hidden="true" />
       <ul className="cats__list">{rows(active, counts, onSelect)}</ul>
       <span className="cats__pill" ref={pill} aria-hidden="true">
-        <span className="cats__copy" ref={copy} inert>
+        <span className="cats__copy" ref={copy} inert="">
           <ul className="cats__list">{rows(active, counts)}</ul>
         </span>
       </span>
