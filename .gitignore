@@ -15,3 +15,6 @@ build
 
 # Written by scripts/release.sh, uploaded to the release, then thrown away.
 latest.json
+
+# Written by Python when scripts/test_changelog.py imports changelog.py.
+__pycache__
