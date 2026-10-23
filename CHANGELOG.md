@@ -13,6 +13,8 @@ it, not about the code.
   every version since yours when you skipped one.
 
 ### Fixed
+- The app opens on a Mac it was not built on. macOS asks once, in System
+  Settings under Privacy & Security, instead of calling the app damaged.
 
 ## 0.1.2 — 2026-10-02
 

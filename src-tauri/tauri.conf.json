@@ -50,7 +50,12 @@
       "binaries/ffmpeg",
       "binaries/whisper-cli"
     ],
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": false,
+      "minimumSystemVersion": "13.0"
+    }
   },
   "plugins": {
     "updater": {
