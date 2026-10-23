@@ -154,11 +154,34 @@ script once on a fresh clone, before `npm run build`.
   no longer helps.
 
 **Updates come from GitHub Releases**, out of the public repo `NM193/tzz-app`.
-`scripts/release.sh <version> "notes"` sets the version, builds, signs,
-publishes, and then checks its own work. `UpdateNotice` asks once at launch and
-never again while the app is open: an update that interrupts an hour-long
-transcription to announce itself is worse than one that waits until tomorrow.
-Only `darwin-aarch64` is published, because the bundled ffmpeg is arm64.
+`scripts/release.sh <version>` sets the version, builds, signs, publishes, and
+then checks its own work. `UpdateNotice` asks once at launch and never again
+while the app is open: an update that interrupts an hour-long transcription to
+announce itself is worse than one that waits until tomorrow. Only
+`darwin-aarch64` is published, because the bundled ffmpeg is arm64.
+
+**What changed is written down as the work happens**, in `CHANGELOG.md`, and
+becomes the notes the update notice shows:
+
+- A change someone using the app would notice gets one line under
+  `## Unreleased` -- New, Improved or Fixed -- in the same commit as the
+  change. Plain English about what they can now do or what stopped going
+  wrong, never about files or functions.
+- A change nobody using the app would notice -- docs, refactors, scripts,
+  tests -- gets no line.
+- A release happens only when the owner asks for one. Show what is under
+  Unreleased (`python3 scripts/changelog.py text Unreleased`), propose a
+  version -- the last number up for fixes and improvements, the middle one
+  when anything is new -- and run `bash scripts/release.sh <version>` only once
+  the owner has agreed to that version. It pushes and publishes.
+
+`scripts/changelog.py` is the only reader of the file, and a strict one: a
+heading other than New, Improved or Fixed stops a release instead of dropping
+the notes under it, and a version typed by mistake -- an older one, or the
+current one while Unreleased has notes -- is refused before anything is pushed.
+The manifest carries the notes twice: plain `notes`, all that a copy from
+before the notice read `changes` can show, and `changes`, the last ten
+versions, from which the notice shows everything since yours.
 
 The key lives at `~/.tauri/tzz.key`, outside the repo, and has no password, so
 a release needs nothing interactive. **Never read it** -- only `tzz.key.pub`,
@@ -212,3 +235,5 @@ Not built: Windows support.
 - `npm run build:vite` -- typecheck the frontend only
 - `bash scripts/fetch-tools.sh` -- put the external tools inside the app
 - `cd src-tauri && cargo test` -- 97 tests, all pure logic
+- `python3 scripts/test_changelog.py` -- the release notes reader
+- `node --test src/lib/releaseNotes.test.ts` -- what the update notice shows
