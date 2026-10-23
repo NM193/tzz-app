@@ -129,6 +129,28 @@ if [ -z "$archive" ] || [ ! -f "$archive.sig" ]; then
   exit 1
 fi
 
+# What a Mac that downloads this will hold against it, proved here rather than
+# assumed. With only the linker's signature, which covers the binary but not
+# the bundle, a downloaded copy is "damaged" and macOS offers no way through.
+# A tool built for a newer macOS than the app promises fails there mid-job.
+echo "== bundle"
+app="$(ls -d "$bundle"/macos/*.app | head -1)"
+if ! codesign --verify --deep --strict "$app" 2> /dev/null; then
+  echo "   the bundle's signature does not hold. A downloaded copy would be 'damaged'."
+  exit 1
+fi
+echo "   signature:  holds for the whole bundle"
+minimum="$(python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["bundle"]["macOS"]["minimumSystemVersion"])')"
+for binary in "$app"/Contents/MacOS/*; do
+  wants="$(vtool -arch arm64 -show-build "$binary" 2> /dev/null | awk '/minos/ {print $2; exit}' || true)"
+  if ! python3 -c 'import sys; a, b = (tuple(map(int, v.split("."))) for v in sys.argv[1:]); sys.exit(a > b)' \
+      "$wants" "$minimum" 2> /dev/null; then
+    echo "   $(basename "$binary") asks for macOS ${wants:-?}; the app promises $minimum."
+    exit 1
+  fi
+done
+echo "   macOS:      every binary runs on $minimum"
+
 echo "== release v$version"
 git add -A
 git commit -qm "Version $version" || true
