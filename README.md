@@ -17,7 +17,7 @@ Download the `.dmg` from the
 [latest release](https://github.com/NM193/tzz-app/releases/latest), open it,
 and drag **Tzz App** into Applications.
 
-It needs a Mac with Apple Silicon (M1 or later) and macOS 13 or later.
+It needs a Mac with Apple Silicon (M1 or later) and macOS 13.3 or later.
 
 ### The first time you open it
 

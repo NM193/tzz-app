@@ -12,8 +12,9 @@
 # So two are fetched as the portable builds their authors publish, and whisper
 # is built here with nothing left outside it.
 #
-# A tool that is already here and answers for itself is left alone, because a
-# release runs this every time and 90 MB a release is a toll for nothing.
+# A tool that is already here, answers for itself and runs on the oldest macOS
+# the app supports is left alone, because a release runs this every time and
+# 90 MB a release is a toll for nothing.
 # `--force` fetches and builds all three again regardless.
 #
 # `npm run build` expects the results to be present.
@@ -31,6 +32,20 @@ TARGET="$(rustc -vV | sed -n 's/^host: //p')"
 mkdir -p "$OUT" "$WORK"
 say() { printf '\n== %s\n' "$1"; }
 
+# The oldest macOS the app supports, from the one place it is set. Every tool
+# has to run there. Built here without it, a tool asks for this Mac's macOS:
+# whisper-cli once asked for 26 and failed on everything older.
+MIN="$(python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["bundle"]["macOS"]["minimumSystemVersion"])')"
+
+# The macOS a binary asks for, as the loader reads it.
+minos() { vtool -arch arm64 -show-build "$1" 2> /dev/null | awk '/minos/ {print $2; exit}'; }
+
+# Whether a binary runs on MIN. One that cannot be read does not.
+runs_on_min() {
+  python3 -c 'import sys; a, b = (tuple(map(int, v.split("."))) for v in sys.argv[1:]); sys.exit(a > b)' \
+    "$(minos "$1")" "$MIN" 2> /dev/null
+}
+
 force=no
 [ "${1:-}" = "--force" ] && force=yes
 
@@ -41,6 +56,7 @@ have() {
   local tool="$OUT/$1-$TARGET"
   [ "$force" = no ] || return 1
   [ -x "$tool" ] || return 1
+  runs_on_min "$tool" || return 1
   shift
   "$tool" "$@" > /dev/null 2>&1
 }
@@ -76,6 +92,10 @@ fetch_ffmpeg() {
 #                           with no CPU and no Metal at all.
 #   METAL_EMBED_LIBRARY=ON  the shaders travel in the binary too.
 #   OPENMP=OFF              one fewer Homebrew library to chase.
+#   DEPLOYMENT_TARGET       the oldest macOS the app supports, not this Mac's.
+#   NATIVE=OFF              every Apple Silicon chip, not this one. Left on,
+#                           ggml builds its CPU kernels for the Mac it is built
+#                           on -- an M5 here -- with instructions an M1 lacks.
 #
 # The result is about five megabytes and needs nothing but macOS itself.
 build_whisper() {
@@ -92,6 +112,8 @@ build_whisper() {
 
   cmake -S "$WORK/whisper.cpp" -B "$WORK/whisper.cpp/build" \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="$MIN" \
+    -DGGML_NATIVE=OFF \
     -DBUILD_SHARED_LIBS=OFF \
     -DGGML_BACKEND_DL=OFF \
     -DGGML_METAL=ON \
@@ -127,6 +149,15 @@ have ffmpeg -version && echo "   already here" || fetch_ffmpeg
 
 say "whisper-cli"
 have whisper-cli --help && echo "   already here" || build_whisper
+
+say "macOS $MIN"
+for name in yt-dlp ffmpeg whisper-cli; do
+  if ! runs_on_min "$OUT/$name-$TARGET"; then
+    echo "   $name asks for macOS $(minos "$OUT/$name-$TARGET"), newer than the app's $MIN"
+    exit 1
+  fi
+done
+echo "   every tool runs there"
 
 say "done"
 du -sh "$OUT" | sed 's/^/   /'

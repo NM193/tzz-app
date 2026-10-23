@@ -15,6 +15,8 @@ it, not about the code.
 ### Fixed
 - The app opens on a Mac it was not built on. macOS asks once, in System
   Settings under Privacy & Security, instead of calling the app damaged.
+- Transcribing with Whisper and reading text off the screen work on any Apple
+  Silicon Mac with macOS 13.3 or later, not only on the newest ones.
 
 ## 0.1.2 — 2026-10-02
 
