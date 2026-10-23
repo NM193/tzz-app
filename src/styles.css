@@ -2279,6 +2279,33 @@ mark {
   user-select: text;
 }
 
+/* What changed, version by version. The labels are only read, so they are the
+   usual mono eyebrow, set tighter; the notes match the plain text above. */
+.update__version + .update__version {
+  margin-top: 0.875rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.update__text .eyebrow {
+  margin: 0.625rem 0 0.25rem;
+}
+
+.update__version + .update__version > .eyebrow:first-child {
+  margin-top: 0;
+}
+
+.update__text ul {
+  margin: 0;
+  padding-left: 1rem;
+  max-width: 34rem;
+  list-style: disc;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--muted-2);
+  user-select: text;
+}
+
 .update__actions {
   display: flex;
   align-items: center;

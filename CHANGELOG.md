@@ -9,6 +9,8 @@ it, not about the code.
 ### New
 
 ### Improved
+- The update notice says what is new, what improved and what was fixed, with
+  every version since yours when you skipped one.
 
 ### Fixed
 

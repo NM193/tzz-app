@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { errorMessage } from "../lib/api";
+import { SECTIONS, notesSince } from "../lib/releaseNotes";
 
 /**
  * A new version, and what is in it.
@@ -25,6 +26,11 @@ export function UpdateNotice() {
   }, []);
 
   if (!update || dismissed) return null;
+
+  // Everything since the version running, so a skipped release is not a lost
+  // one. A manifest without `changes`, a release made by hand say, still has
+  // its plain notes.
+  const versions = notesSince(update.rawJson, update.currentVersion);
 
   async function install() {
     if (!update) return;
@@ -51,7 +57,28 @@ export function UpdateNotice() {
     <div className="update">
       <div className="update__text">
         <b>Version {update.version}</b>
-        {update.body && <p>{update.body}</p>}
+        {versions.length > 0
+          ? versions.map((entry) => (
+              <div key={entry.version} className="update__version">
+                {entry.version !== update.version && (
+                  <span className="eyebrow">{entry.version}</span>
+                )}
+                {SECTIONS.map(
+                  ([key, label]) =>
+                    entry[key].length > 0 && (
+                      <div key={key}>
+                        <span className="eyebrow">{label}</span>
+                        <ul>
+                          {entry[key].map((line, index) => (
+                            <li key={index}>{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ),
+                )}
+              </div>
+            ))
+          : update.body && <p>{update.body}</p>}
       </div>
 
       {error && <p className="notice notice--loud">{error}</p>}
