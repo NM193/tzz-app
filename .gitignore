@@ -18,3 +18,7 @@ latest.json
 
 # Written by Python when scripts/test_changelog.py imports changelog.py.
 __pycache__
+
+# Left by the Playwright MCP after a look at the UI. release.sh commits with
+# git add -A, so anything here would ship with the next version.
+.playwright-mcp
