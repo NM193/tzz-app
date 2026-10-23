@@ -145,13 +145,33 @@ script once on a fresh clone, before `npm run build`.
   when no loopback device exists and offers the page; the URL lives in Rust, so
   nothing on screen can decide where the app sends you. Only needed to record
   the Mac's own sound.
-- **The app is unsigned, and on macOS 15 and later that is not a right-click
-  away.** Apple removed the Control-click override: the first open is refused
-  outright, and the way through is System Settings -> Privacy & Security, where
-  a line about the blocked app appears with **Open Anyway**. Only the first
-  open, and only for a copy that came down through a browser. Writing
-  "right-click -> Open" in the instructions sends someone to a menu item that
-  no longer helps.
+- **The app is signed ad hoc, not by Apple, and on macOS 15 and later that is
+  not a right-click away.** Apple removed the Control-click override: the
+  first open is refused outright, and the way through is System Settings ->
+  Privacy & Security, where a line about the blocked app appears with **Open
+  Anyway**. Only the first open, and only for a copy that came down through a
+  browser. Writing "right-click -> Open" in the instructions sends someone to
+  a menu item that no longer helps.
+- **Ad hoc is not optional.** `bundle.macOS.signingIdentity` is `"-"`. Without
+  it the bundle carries only the linker's signature, which covers the binary
+  and not the bundle, and a downloaded copy is "damaged" with nothing offered
+  in Privacy & Security -- 0.1.2 and earlier shipped that way. Hardened
+  runtime is off: without notarization it buys nothing, and with it the
+  microphone needs an entitlement, for the app and for the ffmpeg it records
+  through.
+- **The oldest macOS is one number**, `bundle.macOS.minimumSystemVersion`
+  (13.3). Tauri writes it into `Info.plist` and builds the Rust for it.
+  `build.rs` passes it to `swiftc` and `fetch-tools.sh` to cmake, because
+  neither reads it on its own, and a tool built here without it asks for this
+  Mac's macOS: 0.1.2's whisper-cli and OCR helper asked for 26. It is 13.3,
+  not 13.0, because ggml's BLAS backend calls the `cblas_sgemm` interface that
+  arrived in 13.3. `release.sh` checks the signature and every binary against
+  the number before it publishes.
+- **whisper-cli is built for every Apple Silicon chip** (`GGML_NATIVE=OFF`).
+  Left to itself, ggml compiles its CPU kernels for the Mac that builds them:
+  on this M5 that put 284 i8mm instructions into 0.1.2's whisper-cli, and an
+  M1 has none. A whisper-cli built natively still answers for itself, so
+  `fetch-tools.sh` keeps it: `--force`, or delete it, after changing a flag.
 
 **Updates come from GitHub Releases**, out of the public repo `NM193/tzz-app`.
 `scripts/release.sh <version>` sets the version, builds, signs, publishes, and
