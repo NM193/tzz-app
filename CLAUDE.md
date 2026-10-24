@@ -37,7 +37,7 @@ macOS ties permissions and settings to it.
     job and deleting what it wrote · `library` reading the output folder ·
     `thumb` one picture per folder · `glass` the frosted window ·
     `model` fetching a Whisper model · `language` hearing which language a
-    file is in
+    file is in · `mp3` an MP3 of a file on disk
 - `src-tauri/helpers/ocr.swift` the Vision text reader.
 
 ## Key patterns
@@ -112,8 +112,9 @@ These were bugs. The comments in the code say the same; this is the index.
   it, and drift correction cannot bridge 44.1 to 48 kHz: the recording came
   out 9% fast, twice as loud and torn. The app sets the input's rate before
   it starts recording.
-- **OCR is cached** in `screens.json` beside the video. Reading an hour costs
-  twelve minutes and never changes.
+- **OCR is cached** in `screens.json` beside a downloaded video, or in a
+  file's library folder. Reading an hour costs twelve minutes and never
+  changes.
 - **A playlist link is `/playlist?list=`, and nothing else.** A watch link
   carries a `list` too -- that is the video you clicked from inside a playlist.
   Unpacking those would turn one pasted link into forty pills. The listing is
@@ -131,7 +132,9 @@ These were bugs. The comments in the code say the same; this is the index.
 ## Working on this
 - **Do not edit Rust while a job is running.** The dev watcher restarts the app
   on every change, which kills the job and orphans its child processes.
-- Output goes to `~/Documents/Tzz Library`, one folder per video.
+- Output goes to `~/Documents/Tzz Library`, one folder per video or file. A
+  file on disk is never touched and nothing is written beside it: its
+  transcript, MP3, picture and screens cache go into its library folder.
 - The window is transparent and frosted by macOS (`services/glass.rs`), so the
   stylesheet paints tints, never an opaque background.
 - Stopping a job (`services/cancel.rs`) kills its process group and deletes

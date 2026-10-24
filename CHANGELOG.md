@@ -9,8 +9,12 @@ it, not about the code.
 ### New
 
 ### Improved
+- A file dropped on Convert waits for Start like a link, so you can set its
+  options first, the language spoken among them.
 
 ### Fixed
+- A file or recording you transcribe now goes into the folder you save to, in
+  a folder of its own with an MP3, instead of beside the original.
 
 ## 0.2.0 — 2026-10-24
 
