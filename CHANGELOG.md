@@ -7,16 +7,21 @@ it, not about the code.
 ## Unreleased
 
 ### New
-- Settings shows which version you have, and Check for updates looks for a
-  newer one whenever you like.
 
 ### Improved
-- A file dropped on Convert waits for Start like a link, so you can set its
-  options first, the language spoken among them.
 
 ### Fixed
-- A file or recording you transcribe now goes into the folder you save to, in
-  a folder of its own with an MP3, instead of beside the original.
+
+## 0.3.0 — 2026-10-24
+
+### New
+- Settings shows which version you have, and Check for updates looks for a newer one whenever you like.
+
+### Improved
+- A file dropped on Convert waits for Start like a link, so you can set its options first, the language spoken among them.
+
+### Fixed
+- A file or recording you transcribe now goes into the folder you save to, in a folder of its own with an MP3, instead of beside the original.
 
 ## 0.2.0 — 2026-10-24
 
