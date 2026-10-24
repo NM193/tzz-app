@@ -164,13 +164,16 @@ pub fn start(
     }
 
     // ffmpeg holds the ends it reads from now; the app keeps the ends it
-    // writes to, one per input, and starts filling them.
+    // writes to, one per input, and starts filling them. Those never block:
+    // capture.rs waits out a full pipe itself, so that stopping cannot hang.
     let mut outs: Vec<Box<dyn Write + Send>> = Vec::new();
     if let Some(stdin) = child.stdin.take() {
+        let _ = never_block(stdin.as_raw_fd());
         outs.push(Box::new(stdin));
     }
     if let Some((reader, writer)) = second_pipe {
         drop(reader);
+        let _ = never_block(writer.as_raw_fd());
         outs.push(Box::new(writer));
     }
 
@@ -247,6 +250,19 @@ fn onto_descriptor_three(fd: RawFd) -> std::io::Result<()> {
     } else {
         Ok(())
     }
+}
+
+/// Make writes to a pipe return at once when it is full, instead of waiting.
+/// Only this end changes; ffmpeg's end is its own and still waits for data.
+fn never_block(fd: RawFd) -> std::io::Result<()> {
+    const F_GETFL: i32 = 3;
+    const F_SETFL: i32 = 4;
+    const O_NONBLOCK: i32 = 0x0004;
+    let flags = unsafe { fcntl(fd, F_GETFL) };
+    if flags == -1 || unsafe { fcntl(fd, F_SETFL, flags | O_NONBLOCK) } == -1 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
 }
 
 extern "C" {
@@ -392,6 +408,20 @@ mod tests {
                 "-i", "pipe:3"
             ]
         );
+    }
+
+    #[test]
+    fn the_apps_end_of_a_pipe_says_full_instead_of_waiting() {
+        let (reader, mut writer) = std::io::pipe().unwrap();
+        never_block(writer.as_raw_fd()).unwrap();
+        // Checked first, so a pipe that would wait fails here and never hangs.
+        assert_ne!(unsafe { fcntl(writer.as_raw_fd(), 3) } & 0x0004, 0);
+
+        let chunk = [0u8; 4096];
+        let said_full = (0..64)
+            .any(|_| matches!(writer.write(&chunk), Err(e) if e.kind() == std::io::ErrorKind::WouldBlock));
+        assert!(said_full);
+        drop(reader);
     }
 
     #[test]

@@ -13,9 +13,10 @@
 #![allow(non_snake_case, non_upper_case_globals)]
 
 use std::ffi::c_void;
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use super::audio_output::{self, fourcc, DeviceId};
 
@@ -244,14 +245,7 @@ extern "C" fn on_filled(
     }
 
     let (data, size) = unsafe { ((*buffer).data as *const u8, (*buffer).byte_size as usize) };
-    let delivered = size == 0
-        || match sink.out.lock() {
-            Ok(mut out) => match out.as_mut() {
-                Some(out) => out.write_all(unsafe { std::slice::from_raw_parts(data, size) }).is_ok(),
-                None => false,
-            },
-            Err(_) => false,
-        };
+    let delivered = size == 0 || deliver(sink, unsafe { std::slice::from_raw_parts(data, size) });
 
     if delivered {
         unsafe { AudioQueueEnqueueBuffer(queue, buffer, 0, std::ptr::null()) };
@@ -259,6 +253,39 @@ extern "C" fn on_filled(
         // Nothing reads the other end any more: ffmpeg has gone.
         sink.open.store(false, Ordering::SeqCst);
     }
+}
+
+/// Write all of `bytes`, waiting out a full pipe for as long as the capture
+/// is open.
+///
+/// The pipe never blocks -- recorder.rs makes it so. A write that blocked
+/// would hold up the queue's thread, and stopping the queue waits for that
+/// thread: if ffmpeg stopped reading, as it does when a second input goes
+/// quiet and holds up the mix, Stop would never return. This way a stop gets
+/// through within a couple of milliseconds.
+fn deliver(sink: &Sink, mut bytes: &[u8]) -> bool {
+    while !bytes.is_empty() {
+        let written = match sink.out.lock() {
+            Ok(mut out) => match out.as_mut() {
+                Some(out) => out.write(bytes),
+                None => return false,
+            },
+            Err(_) => return false,
+        };
+        match written {
+            Ok(0) => return false,
+            Ok(n) => bytes = bytes.get(n..).unwrap_or_default(),
+            Err(e) if e.kind() == ErrorKind::Interrupted => {}
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                if !sink.open.load(Ordering::SeqCst) {
+                    return false;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            Err(_) => return false,
+        }
+    }
+    true
 }
 
 #[cfg(test)]
@@ -292,5 +319,55 @@ mod tests {
     #[test]
     fn current_device_code_matches_audiotoolbox() {
         assert_eq!(kAudioQueueProperty_CurrentDevice, 0x6171_6364); // 'aqcd'
+    }
+
+    /// A pipe that is full a few times, then takes three bytes per write.
+    struct Pipe {
+        full_for: usize,
+        broken: bool,
+        taken: std::sync::Arc<Mutex<Vec<u8>>>,
+    }
+
+    impl Write for Pipe {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if self.broken {
+                return Err(std::io::ErrorKind::BrokenPipe.into());
+            }
+            if self.full_for > 0 {
+                self.full_for -= 1;
+                return Err(std::io::ErrorKind::WouldBlock.into());
+            }
+            let n = bytes.len().min(3);
+            self.taken.lock().unwrap().extend_from_slice(&bytes[..n]);
+            Ok(n)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn sink(pipe: Pipe, open: bool) -> Sink {
+        Sink { out: Mutex::new(Some(Box::new(pipe))), open: AtomicBool::new(open) }
+    }
+
+    #[test]
+    fn a_full_pipe_is_waited_out_until_it_takes_everything() {
+        let taken = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let sink = sink(Pipe { full_for: 2, broken: false, taken: taken.clone() }, true);
+        assert!(deliver(&sink, b"abcdefgh"));
+        assert_eq!(&*taken.lock().unwrap(), b"abcdefgh");
+    }
+
+    #[test]
+    fn a_full_pipe_is_given_up_on_once_the_capture_stops() {
+        let sink = sink(Pipe { full_for: usize::MAX, broken: false, taken: Default::default() }, false);
+        assert!(!deliver(&sink, b"abc"));
+    }
+
+    #[test]
+    fn a_closed_pipe_ends_the_capture() {
+        let sink = sink(Pipe { full_for: 0, broken: true, taken: Default::default() }, true);
+        assert!(!deliver(&sink, b"abc"));
     }
 }
