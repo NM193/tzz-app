@@ -17,6 +17,8 @@ it, not about the code.
   BlackHole and the Multi-Output Device run at different sample rates: the app
   matches them before it starts.
 - Recordings no longer lose a sliver of sound about ten times a second.
+- Clicking the app in the Dock brings its window back after it was minimized
+  or closed.
 
 ## 0.1.3 — 2026-10-24
 

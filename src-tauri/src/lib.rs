@@ -56,5 +56,12 @@ pub fn run() {
             if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
                 services::tray::shutdown(app);
             }
+            // The Dock icon, clicked while the window is minimized or closed.
+            // macOS would bring a minimized window back by itself, but tao
+            // answers "no visible windows" with "do nothing", so the app must.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = event {
+                services::tray::show_window(app);
+            }
         });
 }

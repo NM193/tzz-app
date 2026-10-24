@@ -314,7 +314,7 @@ fn recording_temp_dir() -> std::path::PathBuf {
     std::env::temp_dir().join("yt-mp3-recording")
 }
 
-fn show_window(app: &AppHandle) {
+pub fn show_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
