@@ -32,6 +32,7 @@ pub fn run() {
             commands::media::download_whisper_model,
             commands::media::run_job,
             commands::media::transcribe_file,
+            commands::media::detect_language,
             commands::media::cancel_job,
             commands::media::combine_transcripts,
             commands::media::reveal_in_file_manager,

@@ -9,6 +9,7 @@ use tauri::AppHandle;
 use crate::services::binaries::{self, DependencyStatus};
 use crate::services::cancel;
 use crate::services::combine::{self, Section};
+use crate::services::language::{self, Detected};
 use crate::services::pdf;
 use crate::services::model::{self, Model};
 use crate::services::screen;
@@ -66,6 +67,14 @@ pub struct LocalFileRequest {
     pub transcript_format: Option<String>,
     /// Also read the text that appears on screen, for a video file.
     pub read_screen: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetectRequest {
+    /// Absolute path to an audio or video file already on disk.
+    pub path: String,
+    pub whisper_model_path: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -460,6 +469,20 @@ async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Re
         }),
         warnings: Vec::new(),
     })
+}
+
+/// Which language a file is spoken in, for the dialog to suggest. Not a job:
+/// nothing is written that a Stop would need to take back.
+#[tauri::command]
+pub async fn detect_language(request: DetectRequest) -> Result<Detected, String> {
+    let path = validate_audio_path(&request.path)?;
+    let model_path = request
+        .whisper_model_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| "Choose a Whisper model under Options first.".to_string())?;
+    language::detect(&path, &PathBuf::from(model_path)).await
 }
 
 fn validate_audio_path(raw: &str) -> Result<PathBuf, String> {
