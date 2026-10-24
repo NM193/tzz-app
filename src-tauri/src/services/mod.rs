@@ -1,6 +1,7 @@
 pub mod audio_output;
 pub mod binaries;
 pub mod cancel;
+pub mod capture;
 pub mod combine;
 pub mod document;
 pub mod glass;

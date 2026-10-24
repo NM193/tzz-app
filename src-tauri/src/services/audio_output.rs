@@ -7,7 +7,8 @@
 //!
 //! macOS has no command for this, so it is done through CoreAudio directly.
 //! That keeps it to one file with no extra crate and nothing for the user to
-//! install.
+//! install. The device properties the recorder reads an input by -- its rate,
+//! its channels, its UID -- come from here too.
 
 #![allow(non_snake_case, non_upper_case_globals)]
 
@@ -21,12 +22,14 @@ const kAudioHardwarePropertyDevices: u32 = fourcc(b"dev#");
 const kAudioObjectPropertyName: u32 = fourcc(b"lnam");
 const kAudioDevicePropertyStreamConfiguration: u32 = fourcc(b"slay");
 const kAudioDevicePropertyNominalSampleRate: u32 = fourcc(b"nsrt");
+const kAudioDevicePropertyDeviceUID: u32 = fourcc(b"uid ");
 const kAudioObjectPropertyScopeGlobal: u32 = fourcc(b"glob");
+const kAudioObjectPropertyScopeInput: u32 = fourcc(b"inpt");
 const kAudioObjectPropertyScopeOutput: u32 = fourcc(b"outp");
 const kAudioObjectPropertyElementMain: u32 = 0;
 const kCFStringEncodingUTF8: u32 = 0x0800_0100;
 
-const fn fourcc(code: &[u8; 4]) -> u32 {
+pub(crate) const fn fourcc(code: &[u8; 4]) -> u32 {
     ((code[0] as u32) << 24) | ((code[1] as u32) << 16) | ((code[2] as u32) << 8) | code[3] as u32
 }
 
@@ -212,7 +215,84 @@ pub fn is_multi_output(name: &str) -> bool {
     name.contains("multi-output") || name.contains("multi output")
 }
 
-fn all_devices() -> Vec<DeviceId> {
+/// How many channels a device records, across all its input streams.
+pub fn input_channels(device: DeviceId) -> u32 {
+    let address = PropertyAddress {
+        selector: kAudioDevicePropertyStreamConfiguration,
+        scope: kAudioObjectPropertyScopeInput,
+        element: kAudioObjectPropertyElementMain,
+    };
+    let mut size: u32 = 0;
+
+    let status =
+        unsafe { AudioObjectGetPropertyDataSize(device, &address, 0, std::ptr::null(), &mut size) };
+    if status != 0 || size == 0 {
+        return 0;
+    }
+
+    let mut buffer = vec![0u8; size as usize];
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            device,
+            &address,
+            0,
+            std::ptr::null(),
+            &mut size,
+            buffer.as_mut_ptr() as *mut c_void,
+        )
+    };
+    if status != 0 {
+        return 0;
+    }
+
+    channels_in(&buffer[..size as usize])
+}
+
+/// Sum the channels of an AudioBufferList: a count, padding to eight bytes,
+/// then that many 16-byte buffers that each start with their channel count.
+/// Only what the bytes actually hold is read.
+fn channels_in(list: &[u8]) -> u32 {
+    let read = |at: usize| list.get(at..at + 4).map(|b| u32::from_ne_bytes([b[0], b[1], b[2], b[3]]));
+    let count = read(0).unwrap_or(0) as usize;
+    (0..count).map_while(|i| read(8 + i * 16)).sum()
+}
+
+/// A device's UID, which is how an AudioQueue is told which device to use.
+/// The CFString it wraps is owned here and released when this is dropped.
+pub struct DeviceUid(*const c_void);
+
+impl DeviceUid {
+    pub fn as_cf_string(&self) -> *const c_void {
+        self.0
+    }
+}
+
+impl Drop for DeviceUid {
+    fn drop(&mut self) {
+        unsafe { CFRelease(self.0) };
+    }
+}
+
+pub fn uid(device: DeviceId) -> Option<DeviceUid> {
+    let address = PropertyAddress::global(kAudioDevicePropertyDeviceUID);
+    let mut cf_string: *const c_void = std::ptr::null();
+    let mut size = std::mem::size_of::<*const c_void>() as u32;
+
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            device,
+            &address,
+            0,
+            std::ptr::null(),
+            &mut size,
+            &mut cf_string as *mut _ as *mut c_void,
+        )
+    };
+
+    (status == 0 && !cf_string.is_null()).then_some(DeviceUid(cf_string))
+}
+
+pub(crate) fn all_devices() -> Vec<DeviceId> {
     let address = PropertyAddress::global(kAudioHardwarePropertyDevices);
     let mut size: u32 = 0;
 
@@ -324,6 +404,32 @@ mod tests {
     #[test]
     fn nominal_rate_code_matches_coreaudio() {
         assert_eq!(kAudioDevicePropertyNominalSampleRate, 0x6E73_7274); // 'nsrt'
+    }
+
+    #[test]
+    fn input_property_codes_match_coreaudio() {
+        assert_eq!(kAudioDevicePropertyDeviceUID, 0x7569_6420); // 'uid '
+        assert_eq!(kAudioObjectPropertyScopeInput, 0x696E_7074); // 'inpt'
+    }
+
+    // An AudioBufferList as CoreAudio lays it out on a 64-bit Mac: the count,
+    // four bytes of padding, then 16 bytes per buffer.
+    #[test]
+    fn counts_channels_across_every_input_stream() {
+        let mut list = vec![0u8; 8 + 2 * 16];
+        list[0..4].copy_from_slice(&2u32.to_ne_bytes());
+        list[8..12].copy_from_slice(&2u32.to_ne_bytes());
+        list[24..28].copy_from_slice(&1u32.to_ne_bytes());
+        assert_eq!(channels_in(&list), 3);
+    }
+
+    #[test]
+    fn a_list_shorter_than_it_claims_counts_what_is_there() {
+        let mut list = vec![0u8; 8 + 16];
+        list[0..4].copy_from_slice(&3u32.to_ne_bytes());
+        list[8..12].copy_from_slice(&2u32.to_ne_bytes());
+        assert_eq!(channels_in(&list), 2);
+        assert_eq!(channels_in(&[]), 0);
     }
 
     #[test]
