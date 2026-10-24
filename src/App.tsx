@@ -25,7 +25,7 @@ import { LibraryView } from "./components/LibraryView";
 import { RecordView } from "./components/RecordView";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar, type View } from "./components/Sidebar";
-import { UpdateNotice } from "./components/UpdateNotice";
+import { UpdateNotice, type UpdateStatus } from "./components/UpdateNotice";
 import { LibraryControls } from "./components/LibraryControls";
 import { PLAYLIST_LIMIT } from "./lib/queue";
 import { ReaderControls } from "./components/ReaderControls";
@@ -42,6 +42,10 @@ export default function App() {
   const [links, setLinks] = useState<PendingLink[]>([]);
   const [dragging, setDragging] = useState(false);
   const [libraryVersion, setLibraryVersion] = useState(0);
+  /** Bumped by Check for updates; the notice looks again each time. */
+  const [updateAsked, setUpdateAsked] = useState(0);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: "checking" });
+
   /** Recordings waiting to be told their language before they join the queue. */
   const [asking, setAsking] = useState<string[]>([]);
 
@@ -330,7 +334,7 @@ export default function App() {
       </Sidebar>
 
       <main className="stage">
-        <UpdateNotice />
+        <UpdateNotice asked={updateAsked} onResult={setUpdateStatus} />
         {view === "convert" && (
           <ConvertView
             settings={settings}
@@ -384,6 +388,11 @@ export default function App() {
             update={update}
             deps={deps}
             onError={jobs.setError}
+            updateStatus={updateStatus}
+            onCheckForUpdate={() => {
+              setUpdateStatus({ state: "checking" });
+              setUpdateAsked((n) => n + 1);
+            }}
           />
         )}
       </main>

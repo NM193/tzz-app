@@ -7,6 +7,8 @@ it, not about the code.
 ## Unreleased
 
 ### New
+- Settings shows which version you have, and Check for updates looks for a
+  newer one whenever you like.
 
 ### Improved
 - A file dropped on Convert waits for Start like a link, so you can set its

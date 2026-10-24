@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   errorMessage,
@@ -8,13 +10,29 @@ import {
 import type { Accent, Aurora, Settings, Surface, Tint } from "../lib/settings";
 import { Segmented, Setting, Switch } from "./Controls";
 import { ModelPicker } from "./ModelPicker";
+import type { UpdateStatus } from "./UpdateNotice";
 
 type Props = {
   settings: Settings;
   update: (patch: Partial<Settings>) => void;
   deps: DependencyStatus[];
   onError: (message: string) => void;
+  updateStatus: UpdateStatus;
+  onCheckForUpdate: () => void;
 };
+
+function updateHint(status: UpdateStatus): string {
+  switch (status.state) {
+    case "checking":
+      return "Looking for a newer version…";
+    case "current":
+      return "This is the newest version.";
+    case "available":
+      return `Version ${status.version} is ready: the notice at the top of the window installs it.`;
+    case "failed":
+      return "Could not reach GitHub. Try again when you are online.";
+  }
+}
 
 const BREW: Record<string, string> = {
   "yt-dlp": "yt-dlp",
@@ -22,7 +40,22 @@ const BREW: Record<string, string> = {
   "whisper-cli": "whisper-cpp",
 };
 
-export function SettingsView({ settings, update, deps, onError }: Props) {
+export function SettingsView({
+  settings,
+  update,
+  deps,
+  onError,
+  updateStatus,
+  onCheckForUpdate,
+}: Props) {
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVersion()
+      .then(setVersion)
+      .catch(() => {});
+  }, []);
+
   async function pickFolder() {
     const picked = await open({ directory: true, multiple: false });
     if (typeof picked === "string") update({ outDir: picked });
@@ -196,6 +229,20 @@ export function SettingsView({ settings, update, deps, onError }: Props) {
             </span>
           </Setting>
         ))}
+      </div>
+
+      <div className="section">
+        <h2>Updates</h2>
+        <Setting title={version ? `Tzz App ${version}` : "Tzz App"} hint={updateHint(updateStatus)}>
+          <button
+            type="button"
+            className="ghost ghost--small"
+            disabled={updateStatus.state === "checking"}
+            onClick={onCheckForUpdate}
+          >
+            Check for updates
+          </button>
+        </Setting>
       </div>
     </>
   );
