@@ -18,7 +18,10 @@ fi
 
 echo "Building..."
 cd "$ROOT"
-npm run build
+# Only the .app. The disk image is for downloads, and the updater archive is
+# signed with the release key, which a local install neither has nor needs:
+# with it asked for and no key, the build fails before anything is copied.
+npm run build -- --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
 echo "Replacing /Applications/$APP..."
 # The app was called YT MP3 until it was renamed; clear the old copy out.
