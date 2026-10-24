@@ -8,6 +8,7 @@ pub mod glass;
 pub mod language;
 pub mod library;
 pub mod model;
+pub mod mp3;
 pub mod notes;
 pub mod pdf;
 pub mod recorder;

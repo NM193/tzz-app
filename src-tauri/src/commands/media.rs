@@ -409,7 +409,7 @@ async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Re
     ytdlp::emit(&app, ProgressEvent::stage("transcribing", Some(title.clone())));
 
     let screens = if request.read_screen.unwrap_or(false) && has_picture(&path) {
-        screen::read_screens(&app, &path, &screens_work_dir()).unwrap_or_default()
+        screen::read_screens(&app, &path, &screen::cache_path(&path), &screens_work_dir()).unwrap_or_default()
     } else {
         Vec::new()
     };
@@ -546,7 +546,7 @@ async fn screens_from_youtube(
             app,
             ProgressEvent::stage("transcribing", Some("Reading what is on screen".into())),
         );
-        match screen::read_screens(app, &video, &work_dir) {
+        match screen::read_screens(app, &video, &screen::cache_path(&video), &work_dir) {
             Ok(screens) => screens,
             Err(message) => {
                 warnings.push(message);

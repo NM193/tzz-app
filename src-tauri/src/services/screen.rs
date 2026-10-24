@@ -38,29 +38,34 @@ const SCENE_THRESHOLD: &str = "0.06";
 /// when they arrive alongside other text.
 const MIN_SCREEN_CHARS: usize = 16;
 
-/// What was read from a video, kept beside it.
+/// Where a download keeps what was read from its video: beside it.
 ///
 /// Reading an hour of screen costs about twelve minutes, and nothing about it
 /// changes between runs. Caching turns "try a different layout" from a coffee
-/// break into a second.
-fn cache_path(video: &Path) -> PathBuf {
+/// break into a second. A file on disk keeps its cache in its library folder
+/// instead, so nothing is written beside the original.
+pub fn cache_path(video: &Path) -> PathBuf {
     video.with_extension("screens.json")
 }
 
-fn cached(video: &Path) -> Option<Vec<Screen>> {
-    let cache = cache_path(video);
-    let fresh = std::fs::metadata(&cache)
+fn cached(video: &Path, cache: &Path) -> Option<Vec<Screen>> {
+    let fresh = std::fs::metadata(cache)
         .ok()?
         .modified()
         .ok()?
         >= std::fs::metadata(video).ok()?.modified().ok()?;
 
-    fresh.then(|| serde_json::from_str(&std::fs::read_to_string(&cache).ok()?).ok())?
+    fresh.then(|| serde_json::from_str(&std::fs::read_to_string(cache).ok()?).ok())?
 }
 
 /// Read every distinct screen in a video, or recall what was read before.
-pub fn read_screens(app: &AppHandle, video: &Path, work_dir: &Path) -> Result<Vec<Screen>, String> {
-    if let Some(screens) = cached(video) {
+pub fn read_screens(
+    app: &AppHandle,
+    video: &Path,
+    cache: &Path,
+    work_dir: &Path,
+) -> Result<Vec<Screen>, String> {
+    if let Some(screens) = cached(video, cache) {
         emit(app, ProgressEvent::stage("reading", Some("Screens already read".into())));
         return Ok(screens);
     }
@@ -98,7 +103,7 @@ pub fn read_screens(app: &AppHandle, video: &Path, work_dir: &Path) -> Result<Ve
 
     if let Ok(json) = serde_json::to_string(&screens) {
         // A failed cache write costs a re-read next time, nothing more.
-        let _ = std::fs::write(cache_path(video), json);
+        let _ = std::fs::write(cache, json);
     }
 
     Ok(screens)

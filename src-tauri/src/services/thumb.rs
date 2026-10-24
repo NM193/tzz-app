@@ -64,6 +64,32 @@ pub fn ensure(folder: &Path) -> Option<PathBuf> {
     None
 }
 
+/// The picture for a folder made from a file kept somewhere else: a frame of
+/// that file if it is a video, its waveform if it is sound, and otherwise
+/// whatever the folder itself offers. Nothing is written beside the file.
+pub fn ensure_from(folder: &Path, source: &Path) -> Option<PathBuf> {
+    if let Some(poster) = existing(folder) {
+        return Some(poster);
+    }
+    let poster = folder.join(POSTER);
+    let ext = source
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    let made = if VIDEO.contains(&ext.as_str()) {
+        frame(source, &poster)
+    } else if AUDIO.contains(&ext.as_str()) {
+        waveform(source, &poster)
+    } else {
+        false
+    };
+    if made {
+        Some(poster)
+    } else {
+        ensure(folder)
+    }
+}
+
 /// The video id a job folder is named after: `Some title [dQw4w9WgXcQ]`.
 fn video_id(folder: &Path) -> Option<String> {
     let name = folder.file_name()?.to_str()?.trim_end();
