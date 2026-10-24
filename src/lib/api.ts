@@ -74,6 +74,11 @@ export type LocalFileRequest = {
   language: string | null;
   transcriptFormat: TranscriptFormat;
   readScreen: boolean;
+  /** Absolute folder path; null means the library. */
+  outDir: string | null;
+  wantAudio: boolean;
+  wantTranscript: boolean;
+  audioQuality: AudioQuality;
 };
 
 /** What Whisper heard in a file. Mirrors `Detected` in services/language.rs. */

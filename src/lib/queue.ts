@@ -15,6 +15,8 @@ export type QueueItem = {
   named?: boolean;
   /** A file's spoken language, as Whisper's code. Absent lets Whisper guess. */
   language?: string | null;
+  /** Set by Record, whose button says Transcribe; otherwise the options decide. */
+  wantTranscript?: boolean;
   result?: JobResult;
   error?: string;
 };
@@ -80,10 +82,23 @@ export type PendingLink = {
   failed: boolean;
   /** A playlist waiting to be unpacked into the videos it holds. */
   playlist?: boolean;
+  /** A file on disk waiting among the links; `url` is its path. */
+  file?: boolean;
 };
 
 export function pendingLink(url: string, title?: string): PendingLink {
   return { id: crypto.randomUUID(), url, title: title ?? null, failed: false };
+}
+
+/** A file on disk, waiting on Convert for Start like a link. */
+export function pendingFile(path: string): PendingLink {
+  return {
+    id: crypto.randomUUID(),
+    url: path,
+    title: path.split("/").pop() ?? path,
+    failed: false,
+    file: true,
+  };
 }
 
 /** Mirrors PLAYLIST_LIMIT in src-tauri/src/services/ytdlp.rs. */
@@ -123,7 +138,11 @@ export function shortenUrl(url: string): string {
   }
 }
 
-export function fileItem(path: string, language: string | null = null): QueueItem {
+export function fileItem(
+  path: string,
+  language: string | null = null,
+  wantTranscript?: boolean,
+): QueueItem {
   return {
     id: crypto.randomUUID(),
     kind: "file",
@@ -131,6 +150,7 @@ export function fileItem(path: string, language: string | null = null): QueueIte
     target: path,
     status: "waiting",
     language,
+    wantTranscript,
   };
 }
 

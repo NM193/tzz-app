@@ -69,9 +69,13 @@ export function useJobs(settings: Settings) {
       return transcribeFile({
         path: item.target,
         whisperModelPath: s.whisperModelPath || null,
-        language: item.language ?? null,
+        language: item.language ?? s.transcriptLangs[0] ?? null,
         transcriptFormat: s.transcriptFormat,
         readScreen: s.readScreen,
+        outDir: s.outDir || null,
+        wantAudio: s.wantAudio,
+        wantTranscript: item.wantTranscript ?? s.wantTranscript,
+        audioQuality: s.audioQuality,
       });
     }
     return runJob({
