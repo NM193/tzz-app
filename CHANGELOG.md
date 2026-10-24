@@ -11,6 +11,10 @@ it, not about the code.
 ### Improved
 
 ### Fixed
+
+## 0.3.3 — 2026-10-24
+
+### Fixed
 - A file whose name has a dot in it, like "1. Introduction.mp4", is transcribed again instead of failing with "Whisper produced no transcript".
 
 ## 0.3.2 — 2026-10-24
