@@ -76,6 +76,14 @@ export type LocalFileRequest = {
   readScreen: boolean;
 };
 
+/** What Whisper heard in a file. Mirrors `Detected` in services/language.rs. */
+export type DetectedLanguage = {
+  /** Whisper's code: "sr", "hr", "en", ... */
+  code: string;
+  /** 0-1, how sure it was. */
+  probability: number;
+};
+
 /** Which files a finished transcript leaves on disk. */
 export type TranscriptFormat = "md" | "pdf" | "both";
 
@@ -132,6 +140,14 @@ export function runJob(request: JobRequest): Promise<JobResult> {
 
 export function transcribeFile(request: LocalFileRequest): Promise<JobResult> {
   return invoke("transcribe_file", { request });
+}
+
+/** Which language a file is spoken in. A guess, for the dialog to suggest. */
+export function detectLanguage(
+  path: string,
+  whisperModelPath: string | null,
+): Promise<DetectedLanguage> {
+  return invoke("detect_language", { request: { path, whisperModelPath } });
 }
 
 /**

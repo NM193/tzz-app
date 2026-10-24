@@ -13,6 +13,8 @@ export type QueueItem = {
   status: QueueStatus;
   /** The label came from the paste, not from the site. */
   named?: boolean;
+  /** A file's spoken language, as Whisper's code. Absent lets Whisper guess. */
+  language?: string | null;
   result?: JobResult;
   error?: string;
 };
@@ -121,13 +123,14 @@ export function shortenUrl(url: string): string {
   }
 }
 
-export function fileItem(path: string): QueueItem {
+export function fileItem(path: string, language: string | null = null): QueueItem {
   return {
     id: crypto.randomUUID(),
     kind: "file",
     label: path.split("/").pop() ?? path,
     target: path,
     status: "waiting",
+    language,
   };
 }
 
