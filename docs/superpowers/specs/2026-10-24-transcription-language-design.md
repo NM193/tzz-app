@@ -54,7 +54,9 @@ LISTENING…                       [ Serbian ] [ English ]
   just stopped, a file dropped on the window, Choose files, and Transcribe on
   a saved recording. Today all four call `jobs.enqueue([fileItem(path)])`
   directly.
-- **Several files** share one dialog, a row each.
+- **Several files** share one dialog, a row each. A file that arrives while
+  the dialog is open -- a second recording stopping, another drop -- is added
+  to it as a new row, never a second dialog.
 - **Each row starts at `LISTENING…`** and, a second or three later, reads
   `DETECTED · CROATIAN 53%` and selects the language. A choice made before
   that wins; the detection does not overwrite it.
@@ -79,12 +81,15 @@ cards.
 
 **Rust, `services/language.rs`** (new):
 
-1. Read the file's duration from ffmpeg's header (`Duration: 00:12:34.56`).
+1. Read the file's duration from ffmpeg's header (`Duration: 00:12:34.56`),
+   by running `ffmpeg -i <file>` with no output and reading its stderr. That
+   call always exits non-zero; only a missing `Duration:` line is a failure.
 2. Cut 30 s, 16 kHz mono, starting a third of the way in, so a lecture's
    intro music does not decide; a file of 30 s or less is taken from the
    start. The excerpt goes to a uniquely named file in the temp folder.
 3. Run `whisper-cli -m <model> -f <excerpt> -l auto -dl` and read
-   `auto-detected language: hr (p = 0.526195)` from its output.
+   `auto-detected language: hr (p = 0.526195)` from its stderr, where
+   whisper.cpp logs it.
 4. Delete the excerpt, whatever happened.
 
 It returns `{ code, probability }` and nothing else; naming and grouping
