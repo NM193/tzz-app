@@ -1,14 +1,15 @@
 # Tzz App
 
 A macOS app that turns lectures into readable material. Give it a YouTube link,
-a playlist, or an audio or video file from your Mac, and it makes an MP3, a
-transcript with timestamps and chapters, and -- for screen-share videos -- the
-text that was on screen. It can also record any audio input, including the
-Mac's own sound.
+a playlist, or an audio or video file from your Mac, and it writes a transcript
+with timestamps and -- for screen-share videos -- the text that was on screen.
+From YouTube it also takes the chapters and saves the MP3. It can record any
+audio input as well, including the Mac's own sound.
 
-The transcript is markdown and PDF, one folder per video in
-`~/Documents/Tzz Library`. It is meant as a better source for NotebookLM, or
-for whatever you read it with, than a bare YouTube link: it carries the
+The transcript is markdown, and PDF if you tick it. A YouTube video gets a
+folder of its own in `~/Documents/Tzz Library`; a file from your Mac gets its
+transcript next to it. It is meant as a better source for NotebookLM, or for
+whatever you read it with, than a bare YouTube link: it carries the
 timestamps, the chapters and the screen text that a link does not.
 
 ## Getting it
