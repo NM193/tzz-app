@@ -5,6 +5,7 @@ pub mod capture;
 pub mod combine;
 pub mod document;
 pub mod glass;
+pub mod language;
 pub mod library;
 pub mod model;
 pub mod notes;

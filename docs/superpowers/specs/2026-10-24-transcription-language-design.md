@@ -83,7 +83,8 @@ cards.
 
 1. Read the file's duration from ffmpeg's header (`Duration: 00:12:34.56`),
    by running `ffmpeg -i <file>` with no output and reading its stderr. That
-   call always exits non-zero; only a missing `Duration:` line is a failure.
+   call always exits non-zero. A file without a `Duration:` line, or with
+   `Duration: N/A`, is heard from the start.
 2. Cut 30 s, 16 kHz mono, starting a third of the way in, so a lecture's
    intro music does not decide; a file of 30 s or less is taken from the
    start. The excerpt goes to a uniquely named file in the temp folder.
