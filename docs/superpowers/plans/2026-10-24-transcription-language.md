@@ -1011,9 +1011,16 @@ git commit -m "Write down the language dialog"
 
 ### Task 8: Prove it on the real thing
 
-- [ ] **Step 1: test-runner** -- `cargo test` (116), `npm run build:vite`, `python3 scripts/test_changelog.py`, `node --test src/lib/releaseNotes.test.ts src/lib/language.test.ts`.
-- [ ] **Step 2: reviewer** on the diff since `00ad327`. Fix what it finds.
-- [ ] **Step 3: Ask the owner**, then `npm run install:app` (no job may be running; the script refuses if one is).
-- [ ] **Step 4: The music recording** -- the owner clicks Transcribe on `Recording 2026-10-24 14-50.mp3` in Record. Expected: the dialog says `DETECTED · ENGLISH 38%` (or similar) with English selected; the owner picks Serbian; the new `.transcript.md` beside it reads `Transcript from: whisper (sr)` and is Serbian text.
-- [ ] **Step 5: A clean recording** -- the owner records ten seconds of Serbian on the mic and stops. Expected: the dialog opens on its own, reads `DETECTED · CROATIAN …` with Serbian selected, and Transcribe produces Serbian.
-- [ ] **Step 6: Two at once** -- the owner drops two files on the window; one dialog, two rows, heard one after the other. Cancel queues nothing.
+- [x] **Step 1: test-runner** -- `cargo test` (116), `npm run build:vite`, `python3 scripts/test_changelog.py`, `node --test src/lib/releaseNotes.test.ts src/lib/language.test.ts`.
+- [x] **Step 2: reviewer** on the diff since `00ad327`. Fix what it finds.
+  Fixed: Transcribe now waits for every row to have a guess or a hand choice
+  (it was focused and live while rows still read LISTENING), a guess gives up
+  after 60 s, and the fallback is clamped to Serbian or English.
+- [x] **Step 3: Ask the owner**, then `npm run install:app` (no job may be running; the script refuses if one is).
+- [ ] **Step 4: The music recording** -- not run as written. Instead a new
+  recording of music (`16-18`) went through the dialog and came back
+  `whisper (sr)`, with the song's English lyrics, as sung.
+  Original step: -- the owner clicks Transcribe on `Recording 2026-10-24 14-50.mp3` in Record. Expected: the dialog says `DETECTED · ENGLISH 38%` (or similar) with English selected; the owner picks Serbian; the new `.transcript.md` beside it reads `Transcript from: whisper (sr)` and is Serbian text.
+- [x] **Step 5: A clean recording** -- the owner records ten seconds of Serbian on the mic and stops. Expected: the dialog opens on its own, reads `DETECTED · CROATIAN …` with Serbian selected, and Transcribe produces Serbian.
+  Result (`16-20`): `whisper (sr)`, "Ok, ako pričam sad, ne znam šta da kažem…".
+- [ ] **Step 6: Two at once** -- not run before 0.2.0. -- the owner drops two files on the window; one dialog, two rows, heard one after the other. Cancel queues nothing.
