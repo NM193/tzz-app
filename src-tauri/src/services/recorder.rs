@@ -206,12 +206,22 @@ pub fn start(
 /// What ffmpeg is told about the samples coming down each pipe: raw 32-bit
 /// float at the device's own rate, the first input on stdin and a second on
 /// descriptor 3.
+///
+/// Told everything, ffmpeg still reads about four seconds of each input to
+/// "probe" it, one input after the other, before it starts. With one input
+/// the meter sat dead that long; with two, the second pipe went unread for
+/// four seconds and its queue overflowed. `-probesize 32 -analyzeduration 0`
+/// skips that: the first reading comes after 0.17 s.
 fn input_args(formats: &[Format]) -> Vec<String> {
     formats
         .iter()
         .zip(["pipe:0", "pipe:3"])
         .flat_map(|(format, pipe)| {
             [
+                "-probesize".to_string(),
+                "32".to_string(),
+                "-analyzeduration".to_string(),
+                "0".to_string(),
                 "-f".to_string(),
                 "f32le".to_string(),
                 "-ar".to_string(),
@@ -360,7 +370,13 @@ mod tests {
     #[test]
     fn one_input_arrives_on_stdin_as_raw_float() {
         let args = input_args(&[Format { rate: 48_000.0, channels: 2 }]);
-        assert_eq!(args, ["-f", "f32le", "-ar", "48000", "-ac", "2", "-i", "pipe:0"]);
+        assert_eq!(
+            args,
+            [
+                "-probesize", "32", "-analyzeduration", "0", "-f", "f32le", "-ar", "48000", "-ac", "2",
+                "-i", "pipe:0"
+            ]
+        );
     }
 
     #[test]
@@ -369,7 +385,13 @@ mod tests {
             Format { rate: 48_000.0, channels: 2 },
             Format { rate: 44_100.0, channels: 1 },
         ]);
-        assert_eq!(&args[8..], ["-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "pipe:3"]);
+        assert_eq!(
+            &args[12..],
+            [
+                "-probesize", "32", "-analyzeduration", "0", "-f", "f32le", "-ar", "44100", "-ac", "1",
+                "-i", "pipe:3"
+            ]
+        );
     }
 
     #[test]
