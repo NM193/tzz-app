@@ -1,20 +1,26 @@
 //! Recording an audio input to MP3.
 //!
-//! This is the only part of the app that lives between two commands: ffmpeg
-//! keeps running from Record to Stop, so its handle is held in Tauri-managed
-//! state rather than dropped at the end of a call.
+//! This is the only part of the app that lives between two commands: the
+//! capture and ffmpeg keep running from Record to Stop, so their handles are
+//! held in Tauri-managed state rather than dropped at the end of a call.
+//!
+//! WHY the app reads the input and ffmpeg only encodes it: ffmpeg's own
+//! avfoundation input lost about one buffer in ten (capture.rs has the
+//! numbers). The samples come down a pipe instead, as raw 32-bit float.
 //!
 //! WHY only audio inputs and not "what the speakers play": macOS ships no
-//! loopback device, so `avfoundation` lists the microphone and nothing else.
-//! A virtual driver such as BlackHole simply appears in the same list, which
-//! is why nothing here special-cases it.
+//! loopback device, so CoreAudio lists the microphone and nothing else. A
+//! virtual driver such as BlackHole simply appears in the same list, which is
+//! why nothing here special-cases it.
 //!
 //! WHY two inputs can be recorded at once: a call is the machine's sound and
 //! your own voice, which are two devices. macOS can be told to combine them
-//! into an Aggregate Device by hand, but ffmpeg will open both and mix them
-//! itself, and nobody should have to visit Audio MIDI Setup to record a call.
+//! into an Aggregate Device by hand, but the app reads both and ffmpeg mixes
+//! them, and nobody should have to visit Audio MIDI Setup to record a call.
 
 use std::io::{BufRead, BufReader, Write};
+use std::os::fd::{AsRawFd, RawFd};
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
@@ -24,17 +30,19 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
 use super::binaries;
+use super::capture::{self, Capture, Format};
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioInput {
-    /// The index avfoundation expects, not a position in this list.
+    /// The CoreAudio device id, not a position in this list.
     pub index: u32,
     pub name: String,
 }
 
 pub struct Recording {
     child: Child,
+    captures: Vec<Capture>,
     temp_path: PathBuf,
     started: Instant,
     temp_dir: PathBuf,
@@ -58,66 +66,19 @@ pub fn is_recording(state: &RecorderState) -> bool {
     state.current.lock().map(|slot| slot.is_some()).unwrap_or(false)
 }
 
-/// Ask ffmpeg what it can record from.
+/// Every input the Mac can record from.
 pub fn list_inputs() -> Result<Vec<AudioInput>, String> {
-    let ffmpeg = binaries::require("ffmpeg")?;
-
-    // Listing devices is an "error" as far as ffmpeg is concerned: it prints
-    // the list, then exits complaining there is no input to process.
-    let output = Command::new(ffmpeg)
-        .args(["-f", "avfoundation", "-list_devices", "true", "-i", ""])
-        .output()
-        .map_err(|e| format!("Could not ask ffmpeg for the audio inputs: {e}"))?;
-
-    Ok(parse_inputs(&String::from_utf8_lossy(&output.stderr)))
-}
-
-/// Pull the audio devices out of ffmpeg's listing.
-///
-/// Video devices are printed first in the same `[n] Name` shape, so the audio
-/// heading is what tells the two apart.
-fn parse_inputs(listing: &str) -> Vec<AudioInput> {
-    let mut inputs = Vec::new();
-    let mut in_audio_section = false;
-
-    for line in listing.lines() {
-        let line = match line.split_once("] ") {
-            // Strip the "[AVFoundation indev @ 0x...]" prefix.
-            Some((prefix, rest)) if prefix.contains("AVFoundation") => rest,
-            _ => continue,
-        };
-
-        if line.starts_with("AVFoundation audio devices:") {
-            in_audio_section = true;
-            continue;
-        }
-        if line.starts_with("AVFoundation video devices:") {
-            in_audio_section = false;
-            continue;
-        }
-        if !in_audio_section {
-            continue;
-        }
-
-        if let Some((index, name)) = line.strip_prefix('[').and_then(|l| l.split_once("] ")) {
-            if let Ok(index) = index.parse::<u32>() {
-                inputs.push(AudioInput { index, name: name.trim().to_string() });
-            }
-        }
-    }
-
-    inputs
+    Ok(capture::inputs().into_iter().map(|(index, name)| AudioInput { index, name }).collect())
 }
 
 /// The ffmpeg filter for one input, or for two mixed together.
 ///
 /// Mixing two devices is not just `amix`. They are different shapes -- a
-/// loopback is stereo, a built-in microphone is mono -- and each runs on its
-/// own clock, which is what makes a mix crackle: the two streams drift apart
-/// and samples are dropped or repeated at the seam. So each input is first
-/// brought to the same shape, and then `aresample=async` is allowed to stretch
-/// it a little to stay in step. `first_pts=0` starts both from zero, because
-/// the devices report whatever their own clock said when they opened.
+/// loopback is stereo, a built-in microphone is mono -- so each is first
+/// brought to the same one. They also run on two clocks, and samples down a
+/// pipe carry no clock, only their count, so nothing here keeps them in step:
+/// two devices drift apart by a fraction of a second over an hour, which in a
+/// call nobody hears.
 ///
 /// `normalize=0` keeps both at their own level -- the default halves each,
 /// which turns a quiet voice into nothing. The limiter is what makes that
@@ -126,8 +87,7 @@ fn parse_inputs(listing: &str) -> Vec<AudioInput> {
 /// actually being written; `framelog=info` is load-bearing, because `verbose`
 /// logs below ffmpeg's default level and the meter sits dead.
 fn filter_for(second: Option<u32>) -> String {
-    const SHAPE: &str = "aformat=sample_rates=48000:channel_layouts=stereo,\
-                         aresample=async=1:first_pts=0";
+    const SHAPE: &str = "aformat=sample_rates=48000:channel_layouts=stereo";
 
     match second {
         Some(_) => format!(
@@ -162,23 +122,34 @@ pub fn start(
         .unwrap_or(0);
     let temp_path = temp_dir.join(format!("recording-{stamp}.mp3"));
 
-    // stdin stays open: stopping means sending ffmpeg a "q", not killing it.
-    let mut command = Command::new(ffmpeg);
-    command.args(["-f", "avfoundation", "-i", &format!(":{input_index}")]);
-    if let Some(second) = second_index {
-        command.args(["-f", "avfoundation", "-i", &format!(":{second}")]);
-    }
+    let devices: Vec<u32> = std::iter::once(input_index).chain(second_index).collect();
+    let formats = devices
+        .iter()
+        .map(|&device| capture::format_of(device).ok_or_else(|| "That input is no longer there.".to_string()))
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let mut child = command
+    // A second input reaches ffmpeg on descriptor 3; the read end is moved
+    // there in the child, between fork and exec.
+    let second_pipe = match second_index {
+        Some(_) => Some(std::io::pipe().map_err(|e| format!("Could not start recording: {e}"))?),
+        None => None,
+    };
+
+    let mut command = Command::new(ffmpeg);
+    command
+        .args(input_args(&formats))
         .args(["-filter_complex", &filter_for(second_index)])
         .args(["-map", "[a]"])
         .args(["-c:a", "libmp3lame", "-q:a", "0", "-y"])
         .arg(&temp_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Could not start recording: {e}"))?;
+        .stderr(Stdio::piped());
+    if let Some((reader, _)) = &second_pipe {
+        let fd = reader.as_raw_fd();
+        unsafe { command.pre_exec(move || onto_descriptor_three(fd)) };
+    }
+    let mut child = command.spawn().map_err(|e| format!("Could not start recording: {e}"))?;
 
     if let Some(stderr) = child.stderr.take() {
         let app = app.clone();
@@ -192,12 +163,85 @@ pub fn start(
         });
     }
 
+    // ffmpeg holds the ends it reads from now; the app keeps the ends it
+    // writes to, one per input, and starts filling them.
+    let mut outs: Vec<Box<dyn Write + Send>> = Vec::new();
+    if let Some(stdin) = child.stdin.take() {
+        outs.push(Box::new(stdin));
+    }
+    if let Some((reader, writer)) = second_pipe {
+        drop(reader);
+        outs.push(Box::new(writer));
+    }
+
+    let mut captures = Vec::new();
+    for ((&device, &format), out) in devices.iter().zip(&formats).zip(outs) {
+        match Capture::start(device, format, out) {
+            Ok(capture) => captures.push(capture),
+            Err(message) => {
+                // Half a recording is not what was asked for.
+                drop(captures);
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = std::fs::remove_file(&temp_path);
+                return Err(message);
+            }
+        }
+    }
+
     // The pid outlives us on purpose: if this app is killed rather than closed,
     // the next launch uses it to stop the recorder we left behind.
     let _ = std::fs::write(pid_file(temp_dir), child.id().to_string());
 
-    *slot = Some(Recording { child, temp_path, started: Instant::now(), temp_dir: temp_dir.to_path_buf() });
+    *slot = Some(Recording {
+        child,
+        captures,
+        temp_path,
+        started: Instant::now(),
+        temp_dir: temp_dir.to_path_buf(),
+    });
     Ok(())
+}
+
+/// What ffmpeg is told about the samples coming down each pipe: raw 32-bit
+/// float at the device's own rate, the first input on stdin and a second on
+/// descriptor 3.
+fn input_args(formats: &[Format]) -> Vec<String> {
+    formats
+        .iter()
+        .zip(["pipe:0", "pipe:3"])
+        .flat_map(|(format, pipe)| {
+            [
+                "-f".to_string(),
+                "f32le".to_string(),
+                "-ar".to_string(),
+                (format.rate.round() as u32).to_string(),
+                "-ac".to_string(),
+                format.channels.to_string(),
+                "-i".to_string(),
+                pipe.to_string(),
+            ]
+        })
+        .collect()
+}
+
+/// Put the second input's pipe where `-i pipe:3` reads it. This runs in the
+/// child between fork and exec, so it makes system calls and nothing else.
+fn onto_descriptor_three(fd: RawFd) -> std::io::Result<()> {
+    const F_SETFD: i32 = 2;
+    // A pipe that already is descriptor 3 does not need moving, but it is
+    // marked close-on-exec, and exec would close it: clear the mark instead.
+    let status = if fd == 3 { unsafe { fcntl(3, F_SETFD, 0) } } else { unsafe { dup2(fd, 3) } };
+    if status == -1 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+extern "C" {
+    fn dup2(from: i32, to: i32) -> i32;
+    fn fcntl(fd: i32, command: i32, ...) -> i32;
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -228,11 +272,11 @@ pub fn stop(state: &RecorderState) -> Result<RecordingResult, String> {
 
     let seconds = recording.started.elapsed().as_secs();
 
-    // "q" is ffmpeg's own quit key. Killing it here would leave a file with no
-    // proper header, which nothing can play.
-    if let Some(stdin) = recording.child.stdin.as_mut() {
-        let _ = stdin.write_all(b"q\n");
-        let _ = stdin.flush();
+    // Closing the pipes is the end of the input: ffmpeg flushes what it has,
+    // finishes the MP3 and exits by itself. Killing it would leave a file with
+    // no proper header, which nothing can play.
+    for capture in recording.captures.drain(..) {
+        capture.stop();
     }
 
     recording
@@ -255,9 +299,11 @@ fn pid_file(temp_dir: &Path) -> PathBuf {
 
 /// Stop a recorder left running by a previous, ungracefully ended session.
 ///
-/// A killed app takes nothing with it: ffmpeg keeps recording, and once the
-/// earlier file has been saved it keeps writing into that saved file. SIGINT
-/// rather than SIGKILL, so whatever it was writing stays playable.
+/// A killed app used to leave ffmpeg recording on its own. Now its pipes close
+/// with the app, so ffmpeg finishes the file and exits by itself, and by the
+/// next launch the pid it left may belong to something else entirely. So this
+/// stops only a process that is still one of ours: ffmpeg, writing into the
+/// recording folder. SIGINT rather than SIGKILL, so its file stays playable.
 pub fn stop_orphan(temp_dir: &Path) {
     let path = pid_file(temp_dir);
     let Ok(contents) = std::fs::read_to_string(&path) else {
@@ -268,12 +314,23 @@ pub fn stop_orphan(temp_dir: &Path) {
     let Ok(pid) = contents.trim().parse::<u32>() else {
         return;
     };
+    let Ok(listing) = Command::new("/bin/ps").args(["-o", "args=", "-p", &pid.to_string()]).output() else {
+        return;
+    };
+    if !is_recorder(&String::from_utf8_lossy(&listing.stdout), temp_dir) {
+        return;
+    }
 
     let _ = Command::new("/bin/kill")
         .args(["-INT", &pid.to_string()])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status();
+}
+
+/// Whether a process's command line is one of this app's recorders.
+fn is_recorder(command_line: &str, temp_dir: &Path) -> bool {
+    command_line.contains("ffmpeg") && command_line.contains(&*temp_dir.to_string_lossy())
 }
 
 /// Move the finished recording where the user chose.
@@ -300,25 +357,32 @@ fn lock_error() -> String {
 mod tests {
     use super::*;
 
-    const LISTING: &str = "\
-[AVFoundation indev @ 0x1] AVFoundation video devices:
-[AVFoundation indev @ 0x1] [0] MacBook Pro Camera
-[AVFoundation indev @ 0x1] [1] Capture screen 0
-[AVFoundation indev @ 0x1] AVFoundation audio devices:
-[AVFoundation indev @ 0x1] [0] MacBook Pro Microphone
-[AVFoundation indev @ 0x1] [1] BlackHole 2ch
-";
+    #[test]
+    fn one_input_arrives_on_stdin_as_raw_float() {
+        let args = input_args(&[Format { rate: 48_000.0, channels: 2 }]);
+        assert_eq!(args, ["-f", "f32le", "-ar", "48000", "-ac", "2", "-i", "pipe:0"]);
+    }
 
     #[test]
-    fn takes_the_audio_devices_and_not_the_cameras() {
-        let inputs = parse_inputs(LISTING);
-        assert_eq!(
-            inputs,
-            vec![
-                AudioInput { index: 0, name: "MacBook Pro Microphone".into() },
-                AudioInput { index: 1, name: "BlackHole 2ch".into() },
-            ]
-        );
+    fn a_second_input_arrives_on_descriptor_three() {
+        let args = input_args(&[
+            Format { rate: 48_000.0, channels: 2 },
+            Format { rate: 44_100.0, channels: 1 },
+        ]);
+        assert_eq!(&args[8..], ["-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "pipe:3"]);
+    }
+
+    #[test]
+    fn only_a_recorder_writing_into_our_folder_is_stopped() {
+        let folder = Path::new("/var/folders/x/T/yt-mp3-recording");
+        assert!(is_recorder(
+            "/Applications/Tzz App.app/Contents/MacOS/ffmpeg -f f32le -ar 48000 -ac 2 -i pipe:0 \
+             -y /var/folders/x/T/yt-mp3-recording/recording-1792834001.mp3",
+            folder
+        ));
+        // The pid went to something else, or to nothing at all.
+        assert!(!is_recorder("/usr/bin/vim notes.txt", folder));
+        assert!(!is_recorder("", folder));
     }
 
     #[test]
@@ -327,8 +391,6 @@ mod tests {
 
         let both = filter_for(Some(1));
         assert!(both.contains("amix=inputs=2"), "{both}");
-        // Two devices on two clocks drift apart; that is what crackles.
-        assert_eq!(both.matches("aresample=async=1").count(), 2, "{both}");
         // A stereo loopback and a mono microphone are different shapes.
         assert_eq!(both.matches("channel_layouts=stereo").count(), 2, "{both}");
         // Halving each is what the default does, and a quiet voice disappears.
@@ -336,13 +398,6 @@ mod tests {
         // Two loud sources sum past full scale.
         assert!(both.contains("alimiter"), "{both}");
         assert!(both.ends_with("ebur128=framelog=info[a]"), "{both}");
-    }
-
-    #[test]
-    fn copes_with_a_machine_that_reports_no_audio_inputs() {
-        let listing = "[AVFoundation indev @ 0x1] AVFoundation video devices:\n\
-                       [AVFoundation indev @ 0x1] [0] MacBook Pro Camera\n";
-        assert!(parse_inputs(listing).is_empty());
     }
 
     // Copied from ffmpeg's actual output: no space after "M:".
@@ -367,8 +422,4 @@ mod tests {
         assert_eq!(parse_level("[Parsed_ebur128_0 @ 0x1] Summary:"), None);
     }
 
-    #[test]
-    fn ignores_unrelated_ffmpeg_chatter() {
-        assert!(parse_inputs("ffmpeg version 7.1\nbuilt with clang\n").is_empty());
-    }
 }

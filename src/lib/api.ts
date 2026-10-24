@@ -166,7 +166,7 @@ export function combineTranscripts(request: CombineRequest): Promise<CombineResu
 }
 
 export type AudioInput = {
-  /** The index avfoundation expects, not a position in the list. */
+  /** The CoreAudio device id, not a position in the list. */
   index: number;
   name: string;
 };

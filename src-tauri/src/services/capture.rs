@@ -150,9 +150,11 @@ pub struct Capture {
 unsafe impl Send for Capture {}
 
 impl Capture {
-    pub fn start(device: DeviceId, out: Box<dyn Write + Send>) -> Result<(Capture, Format), String> {
-        let format = format_of(device).ok_or("That input has nothing to record from.")?;
-        let uid = audio_output::uid(device).ok_or("That input could not be found.")?;
+    /// Record `device` into `out` as `format` -- the format ffmpeg was told to
+    /// expect. Should the device have moved to another rate since, the queue
+    /// converts, so what arrives is still what ffmpeg reads it as.
+    pub fn start(device: DeviceId, format: Format, out: Box<dyn Write + Send>) -> Result<Capture, String> {
+        let uid = audio_output::uid(device).ok_or("That input is no longer there.")?;
         let description = float_format(format.rate, format.channels);
         let sink = Box::into_raw(Box::new(Sink { out: Mutex::new(Some(out)), open: AtomicBool::new(true) }));
 
@@ -203,7 +205,7 @@ impl Capture {
             return Err(format!("Could not start recording that input (CoreAudio error {status})."));
         }
 
-        Ok((capture, format))
+        Ok(capture)
     }
 
     pub fn stop(self) {

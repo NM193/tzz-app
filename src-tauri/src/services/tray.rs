@@ -18,7 +18,7 @@ const TRAY_ID: &str = "recorder";
 const MENU_TOGGLE: &str = "toggle";
 const MENU_OPEN: &str = "open";
 const MENU_QUIT: &str = "quit";
-/// Menu ids for inputs are "input:<avfoundation index>".
+/// Menu ids for inputs are "input:<CoreAudio device id>".
 const MENU_INPUT_PREFIX: &str = "input:";
 
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
@@ -105,7 +105,7 @@ pub fn toggle(app: &AppHandle) {
             }
         }
     } else {
-        let index = selected_input(app).unwrap_or(0);
+        let index = selected_input(app).or_else(first_input).unwrap_or(0);
         let second = second_input(app);
         match_rate_for(app, index);
         match recorder::start(app, &state, index, second, &recording_temp_dir()) {
@@ -221,10 +221,8 @@ fn match_rate_for(app: &AppHandle, input_index: u32) {
     let Some((multi, _)) = audio_output::find_multi_output() else {
         return;
     };
-    let Some(input) = audio_output::id_named(&name) else {
-        return;
-    };
-    let (Some(wanted), Some(current)) = (audio_output::nominal_rate(multi), audio_output::nominal_rate(input))
+    let (Some(wanted), Some(current)) =
+        (audio_output::nominal_rate(multi), audio_output::nominal_rate(input_index))
     else {
         return;
     };
@@ -232,7 +230,7 @@ fn match_rate_for(app: &AppHandle, input_index: u32) {
         return;
     }
 
-    if audio_output::set_nominal_rate(input, wanted).is_err() {
+    if audio_output::set_nominal_rate(input_index, wanted).is_err() {
         let _ = app.emit(
             "recording://error",
             format!(
@@ -253,6 +251,12 @@ fn captures_system_audio(input_index: u32) -> bool {
 fn is_capture_driver(name: &str) -> bool {
     let name = name.to_lowercase();
     name.contains("blackhole") || name.contains("aggregate")
+}
+
+/// What to record from when nothing has been chosen: the first input listed.
+/// An input is a CoreAudio device id, and 0 is no device at all.
+fn first_input() -> Option<u32> {
+    recorder::list_inputs().ok()?.first().map(|input| input.index)
 }
 
 fn input_name(input_index: u32) -> Option<String> {

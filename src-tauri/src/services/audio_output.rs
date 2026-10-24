@@ -188,11 +188,6 @@ pub fn set_nominal_rate(device: DeviceId, rate: f64) -> Result<(), String> {
     }
 }
 
-/// The device with this exact name, input or output.
-pub fn id_named(name: &str) -> Option<DeviceId> {
-    all_devices().into_iter().find(|&device| device_name(device).as_deref() == Some(name))
-}
-
 /// Every device that can play sound, with its name.
 pub fn outputs() -> Vec<(DeviceId, String)> {
     all_devices()
