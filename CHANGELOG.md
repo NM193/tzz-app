@@ -11,8 +11,11 @@ it, not about the code.
 ### Improved
 
 ### Fixed
-- Reading the screen now includes a video's first and last screens, which it
-  used to skip -- usually the title slide and the closing one.
+
+## 0.3.1 — 2026-10-24
+
+### Fixed
+- Reading the screen now includes a video's first and last screens, which it used to skip -- usually the title slide and the closing one.
 
 ## 0.3.0 — 2026-10-24
 
