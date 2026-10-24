@@ -62,6 +62,18 @@ export function cardEnter(el: HTMLElement, index: number) {
   );
 }
 
+/** A dialog: it opens bottom to top, like a card's cover. */
+export function sheetEnter(el: HTMLElement) {
+  if (stillPreferred()) return;
+  el.animate(
+    [
+      { clipPath: "inset(100% 0 0 0 round .5rem)" },
+      { clipPath: "inset(0 0 0 0 round .5rem)" },
+    ],
+    { duration: 700, easing: WIPE, fill: "backwards" },
+  );
+}
+
 /** Where every `[data-id]` child sits right now -- the "before" of a FLIP. */
 export function captureRects(box: HTMLElement): Map<string, DOMRect> {
   return new Map(
