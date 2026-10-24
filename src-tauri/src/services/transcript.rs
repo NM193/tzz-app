@@ -531,7 +531,7 @@ pub async fn whisper_srt(
         .map_err(|e| format!("Whisper did not finish cleanly: {e}"))?;
     cancel::check()?;
 
-    let srt_path = out_base.with_extension("srt");
+    let srt_path = whisper_srt_path(&out_base);
     let srt = std::fs::read_to_string(&srt_path).map_err(|_| {
         let tail: Vec<&str> = log.iter().rev().take(4).map(String::as_str).collect();
         format!("Whisper produced no transcript. {}", tail.join(" "))
@@ -541,6 +541,15 @@ pub async fn whisper_srt(
     let _ = std::fs::remove_file(&srt_path);
 
     Ok(srt)
+}
+
+/// whisper-cli appends ".srt" to the `-of` base. `with_extension` would
+/// replace everything after the last dot instead, so "1. Intro" was looked
+/// for as "1.srt" and a finished transcript was reported as missing.
+fn whisper_srt_path(out_base: &Path) -> PathBuf {
+    let mut name = out_base.as_os_str().to_owned();
+    name.push(".srt");
+    PathBuf::from(name)
 }
 
 /// `whisper_print_progress_callback: progress =  35%` -> `35.0`
@@ -834,6 +843,15 @@ mod tests {
         ] {
             assert_eq!(parse_whisper_progress(line), None, "{line}");
         }
+    }
+
+    #[test]
+    fn finds_whispers_srt_when_the_name_has_a_dot() {
+        let base = Path::new("/tmp/yt-mp3-whisper/1. Kako Napraviti Dobru Reklamu Uvod");
+        assert_eq!(
+            whisper_srt_path(base),
+            PathBuf::from("/tmp/yt-mp3-whisper/1. Kako Napraviti Dobru Reklamu Uvod.srt")
+        );
     }
 
     #[test]
