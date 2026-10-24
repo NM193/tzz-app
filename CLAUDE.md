@@ -36,7 +36,8 @@ macOS ties permissions and settings to it.
     `audio_output` CoreAudio · `tray` the menu bar icon · `cancel` stopping a
     job and deleting what it wrote · `library` reading the output folder ·
     `thumb` one picture per folder · `glass` the frosted window ·
-    `model` fetching a Whisper model
+    `model` fetching a Whisper model · `language` hearing which language a
+    file is in
 - `src-tauri/helpers/ocr.swift` the Vision text reader.
 
 ## Key patterns
@@ -255,7 +256,8 @@ combined document per queue, local audio and video files, audio recording with
 a menu bar icon and level meter, automatic output-device switching, stopping a
 job mid-run, a Library that searches and filters what is on disk, a picture per
 folder, a notification when a run ends, reading a transcript inside the app,
-unpacking a playlist link into the videos it holds, finding a word in an open
+unpacking a playlist link into the videos it holds, asking which language a
+file is spoken in before transcribing it, finding a word in an open
 document, copying a chapter out and keeping what you bring back as a note.
 
 Not built: Windows support.

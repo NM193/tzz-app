@@ -7,6 +7,8 @@ it, not about the code.
 ## Unreleased
 
 ### New
+- Before transcribing a recording or a file, the app asks which language is
+  spoken, with its own guess already chosen.
 
 ### Improved
 
