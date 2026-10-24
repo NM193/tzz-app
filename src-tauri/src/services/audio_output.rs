@@ -20,6 +20,7 @@ const kAudioHardwarePropertyDefaultSystemOutputDevice: u32 = fourcc(b"sOut");
 const kAudioHardwarePropertyDevices: u32 = fourcc(b"dev#");
 const kAudioObjectPropertyName: u32 = fourcc(b"lnam");
 const kAudioDevicePropertyStreamConfiguration: u32 = fourcc(b"slay");
+const kAudioDevicePropertyNominalSampleRate: u32 = fourcc(b"nsrt");
 const kAudioObjectPropertyScopeGlobal: u32 = fourcc(b"glob");
 const kAudioObjectPropertyScopeOutput: u32 = fourcc(b"outp");
 const kAudioObjectPropertyElementMain: u32 = 0;
@@ -135,6 +136,58 @@ pub fn set_output(device: DeviceId) -> Result<(), String> {
     } else {
         Err(format!("Could not change the sound output (CoreAudio error {status})."))
     }
+}
+
+/// The sample rate a device runs at, in Hz.
+pub fn nominal_rate(device: DeviceId) -> Option<f64> {
+    let address = PropertyAddress::global(kAudioDevicePropertyNominalSampleRate);
+    let mut rate: f64 = 0.0;
+    let mut size = std::mem::size_of::<f64>() as u32;
+
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            device,
+            &address,
+            0,
+            std::ptr::null(),
+            &mut size,
+            &mut rate as *mut _ as *mut c_void,
+        )
+    };
+
+    (status == 0 && rate > 0.0).then_some(rate)
+}
+
+/// Run a device at another sample rate.
+///
+/// WHY: a Multi-Output Device does not set the rate of the devices inside it.
+/// With BlackHole at 44.1 kHz and the Multi-Output Device at 48 kHz, drift
+/// correction cannot bridge the 9%, and the recording came out 9% fast, twice
+/// as loud and garbled.
+pub fn set_nominal_rate(device: DeviceId, rate: f64) -> Result<(), String> {
+    let address = PropertyAddress::global(kAudioDevicePropertyNominalSampleRate);
+
+    let status = unsafe {
+        AudioObjectSetPropertyData(
+            device,
+            &address,
+            0,
+            std::ptr::null(),
+            std::mem::size_of::<f64>() as u32,
+            &rate as *const _ as *const c_void,
+        )
+    };
+
+    if status == 0 {
+        Ok(())
+    } else {
+        Err(format!("Could not change the sample rate (CoreAudio error {status})."))
+    }
+}
+
+/// The device with this exact name, input or output.
+pub fn id_named(name: &str) -> Option<DeviceId> {
+    all_devices().into_iter().find(|&device| device_name(device).as_deref() == Some(name))
 }
 
 /// Every device that can play sound, with its name.
@@ -266,6 +319,11 @@ mod tests {
         assert_eq!(kAudioHardwarePropertyDefaultOutputDevice, 0x644F_7574);
         assert_eq!(kAudioHardwarePropertyDevices, 0x6465_7623);
         assert_eq!(kAudioObjectPropertyScopeGlobal, 0x676C_6F62);
+    }
+
+    #[test]
+    fn nominal_rate_code_matches_coreaudio() {
+        assert_eq!(kAudioDevicePropertyNominalSampleRate, 0x6E73_7274); // 'nsrt'
     }
 
     #[test]

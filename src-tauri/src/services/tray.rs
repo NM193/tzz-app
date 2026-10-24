@@ -107,6 +107,7 @@ pub fn toggle(app: &AppHandle) {
     } else {
         let index = selected_input(app).unwrap_or(0);
         let second = second_input(app);
+        match_rate_for(app, index);
         match recorder::start(app, &state, index, second, &recording_temp_dir()) {
             Ok(()) => {
                 route_output_for(app, index);
@@ -206,17 +207,60 @@ pub fn shutdown(app: &AppHandle) {
     restore_output(app);
 }
 
-/// BlackHole and aggregate devices built on it are what carries system sound.
+/// Run the capture driver at the Multi-Output Device's sample rate.
+///
+/// Before the recording starts, not after: a rate changed under a running
+/// capture changes its format mid-stream. A Multi-Output Device does not do
+/// this for the devices inside it, and with BlackHole at 44.1 kHz under one at
+/// 48 kHz the recording came out 9% fast, twice as loud and garbled.
+fn match_rate_for(app: &AppHandle, input_index: u32) {
+    let Some(name) = input_name(input_index).filter(|name| is_capture_driver(name)) else {
+        return;
+    };
+    // No Multi-Output Device is reported once the recording starts.
+    let Some((multi, _)) = audio_output::find_multi_output() else {
+        return;
+    };
+    let Some(input) = audio_output::id_named(&name) else {
+        return;
+    };
+    let (Some(wanted), Some(current)) = (audio_output::nominal_rate(multi), audio_output::nominal_rate(input))
+    else {
+        return;
+    };
+    if (wanted - current).abs() < 0.5 {
+        return;
+    }
+
+    if audio_output::set_nominal_rate(input, wanted).is_err() {
+        let _ = app.emit(
+            "recording://error",
+            format!(
+                "{name} runs at {} kHz and the Multi-Output Device at {} kHz, and the app could not \
+                 change it. Set both to the same rate in Audio MIDI Setup.",
+                current / 1000.0,
+                wanted / 1000.0
+            ),
+        );
+    }
+}
+
 fn captures_system_audio(input_index: u32) -> bool {
+    input_name(input_index).is_some_and(|name| is_capture_driver(&name))
+}
+
+/// BlackHole and aggregate devices built on it are what carries system sound.
+fn is_capture_driver(name: &str) -> bool {
+    let name = name.to_lowercase();
+    name.contains("blackhole") || name.contains("aggregate")
+}
+
+fn input_name(input_index: u32) -> Option<String> {
     recorder::list_inputs()
         .unwrap_or_default()
         .into_iter()
         .find(|input| input.index == input_index)
-        .map(|input| {
-            let name = input.name.to_lowercase();
-            name.contains("blackhole") || name.contains("aggregate")
-        })
-        .unwrap_or(false)
+        .map(|input| input.name)
 }
 
 pub fn set_input(app: &AppHandle, index: u32) {

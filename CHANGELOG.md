@@ -11,6 +11,9 @@ it, not about the code.
 ### Improved
 
 ### Fixed
+- Recording the Mac's sound no longer comes out too fast and garbled when
+  BlackHole and the Multi-Output Device run at different sample rates: the app
+  matches them before it starts.
 
 ## 0.1.3 — 2026-10-24
 
