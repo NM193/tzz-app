@@ -119,13 +119,27 @@ PY
 echo "== tools"
 bash scripts/fetch-tools.sh > /dev/null
 
+# This build's files, by name, with the last archive gone before it starts.
+# bundle/ keeps whatever earlier builds left there -- an app from before the
+# rename, the archive the last release uploaded. A glob picks those up, and a
+# check that a file exists passes on them: a build that made no archive would
+# quietly ship the last one.
+name="$(python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["productName"])')"
+bundle="src-tauri/target/release/bundle"
+app="$bundle/macos/$name.app"
+archive="$bundle/macos/$name.app.tar.gz"
+dmg="$bundle/dmg/${name}_${version}_aarch64.dmg"
+rm -f "$archive" "$archive.sig"
+
 echo "== build"
 npm run build
 
-bundle="src-tauri/target/release/bundle"
-archive="$(ls "$bundle"/macos/*.app.tar.gz 2>/dev/null | head -1)"
-if [ -z "$archive" ] || [ ! -f "$archive.sig" ]; then
+if [ ! -f "$archive" ] || [ ! -f "$archive.sig" ]; then
   echo "No signed updater archive was produced. Is the signing key right?"
+  exit 1
+fi
+if [ ! -d "$app" ] || [ ! -f "$dmg" ]; then
+  echo "The build left no $app or no $dmg."
   exit 1
 fi
 
@@ -134,7 +148,6 @@ fi
 # the bundle, a downloaded copy is "damaged" and macOS offers no way through.
 # A tool built for a newer macOS than the app promises fails there mid-job.
 echo "== bundle"
-app="$(ls -d "$bundle"/macos/*.app | head -1)"
 if ! codesign --verify --deep --strict "$app" 2> /dev/null; then
   echo "   the bundle's signature does not hold. A downloaded copy would be 'damaged'."
   exit 1
@@ -168,12 +181,12 @@ if gh release view "v$version" > /dev/null 2>&1; then
   echo "   v$version exists; replacing what it holds"
   gh release edit "v$version" --title "Tzz App $version" --notes "$notes" > /dev/null
   gh release upload "v$version" \
-    "$archive" "$archive.sig" "$bundle"/dmg/*.dmg --clobber
+    "$archive" "$archive.sig" "$dmg" --clobber
 else
   gh release create "v$version" \
     --title "Tzz App $version" \
     --notes "$notes" \
-    "$archive" "$archive.sig" "$bundle"/dmg/*.dmg
+    "$archive" "$archive.sig" "$dmg"
 fi
 
 # The manifest goes up second, because its url has to name the archive exactly
