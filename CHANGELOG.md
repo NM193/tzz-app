@@ -7,18 +7,20 @@ it, not about the code.
 ## Unreleased
 
 ### New
-- Before transcribing a recording or a file, the app asks which language is
-  spoken, with its own guess already chosen.
 
 ### Improved
 
 ### Fixed
-- Recording the Mac's sound no longer comes out too fast and garbled when
-  BlackHole and the Multi-Output Device run at different sample rates: the app
-  matches them before it starts.
+
+## 0.2.0 — 2026-10-24
+
+### New
+- Before transcribing a recording or a file, the app asks which language is spoken, with its own guess already chosen.
+
+### Fixed
+- Recording the Mac's sound no longer comes out too fast and garbled when BlackHole and the Multi-Output Device run at different sample rates: the app matches them before it starts.
 - Recordings no longer lose a sliver of sound about ten times a second.
-- Clicking the app in the Dock brings its window back after it was minimized
-  or closed.
+- Clicking the app in the Dock brings its window back after it was minimized or closed.
 
 ## 0.1.3 — 2026-10-24
 
