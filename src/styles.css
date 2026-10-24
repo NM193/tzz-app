@@ -334,6 +334,38 @@ mark {
   background: var(--bone);
 }
 
+/*
+  The version, under the status and aligned with its text. Only read, so mono,
+  uppercase and dim. A newer version is the one thing here you can click, so
+  it is sans -- and the accent, at the same small size, which is all the
+  emphasis it gets.
+*/
+.side__version {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.625rem 0.625rem 0 1.6875rem;
+  font: 500 0.625rem/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--caption);
+}
+
+.side__version button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 500 0.6875rem/1 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--accent);
+}
+
+.side__version button:hover {
+  text-decoration: underline;
+}
+
 .status b {
   display: block;
   font: 500 0.8125rem var(--font-sans);

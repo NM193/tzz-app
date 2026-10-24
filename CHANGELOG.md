@@ -9,6 +9,8 @@ it, not about the code.
 ### New
 
 ### Improved
+- The version you have is shown under the status in the sidebar, with a quiet
+  note there when a newer one is out.
 
 ### Fixed
 

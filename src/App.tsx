@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import {
   checkDependencies,
@@ -45,6 +46,14 @@ export default function App() {
   /** Bumped by Check for updates; the notice looks again each time. */
   const [updateAsked, setUpdateAsked] = useState(0);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: "checking" });
+  /** The version running, for the sidebar and Settings. */
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVersion()
+      .then(setVersion)
+      .catch(() => {});
+  }, []);
 
   /** Recordings waiting to be told their language before they join the queue. */
   const [asking, setAsking] = useState<string[]>([]);
@@ -302,7 +311,15 @@ export default function App() {
 
   return (
     <div className={`app ${dragging ? "app--dragging" : ""}`}>
-      <Sidebar view={view} onNavigate={setView} status={status}>
+      <Sidebar
+        view={view}
+        onNavigate={setView}
+        status={status}
+        version={version}
+        newer={updateStatus.state === "available" ? updateStatus.version : null}
+        // Looks again, which also brings the notice back after Later.
+        onShowUpdate={() => setUpdateAsked((n) => n + 1)}
+      >
         {view === "library" &&
           (reading ? (
             <ReaderControls
@@ -388,6 +405,7 @@ export default function App() {
             update={update}
             deps={deps}
             onError={jobs.setError}
+            version={version}
             updateStatus={updateStatus}
             onCheckForUpdate={() => {
               setUpdateStatus({ state: "checking" });

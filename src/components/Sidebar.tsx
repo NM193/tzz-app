@@ -20,6 +20,12 @@ type Props = {
   view: View;
   onNavigate: (view: View) => void;
   status: Status;
+  /** The version running; null until it has been read. */
+  version: string | null;
+  /** A newer version, once one has been found. */
+  newer: string | null;
+  /** Bring the update notice back, even after Later. */
+  onShowUpdate: () => void;
   /** Controls that belong to the current screen, under the navigation. */
   children?: ReactNode;
 };
@@ -47,7 +53,15 @@ function rows(onNavigate?: (view: View) => void) {
  * exactly where the pill covers it, mid-slide included. The copy is `inert`,
  * so Tab and a screen reader never reach the duplicate.
  */
-export function Sidebar({ view, onNavigate, status, children }: Props) {
+export function Sidebar({
+  view,
+  onNavigate,
+  status,
+  version,
+  newer,
+  onShowUpdate,
+  children,
+}: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const pill = useRef<HTMLSpanElement>(null);
   const copy = useRef<HTMLSpanElement>(null);
@@ -105,6 +119,17 @@ export function Sidebar({ view, onNavigate, status, children }: Props) {
           <small>{status.caption}</small>
         </span>
       </div>
+
+      {version && (
+        <div className="side__version">
+          <span>v{version}</span>
+          {newer && (
+            <button type="button" onClick={onShowUpdate}>
+              {newer} is out
+            </button>
+          )}
+        </div>
+      )}
     </aside>
   );
 }

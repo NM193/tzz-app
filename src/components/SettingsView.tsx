@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-import { getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   errorMessage,
@@ -17,6 +15,8 @@ type Props = {
   update: (patch: Partial<Settings>) => void;
   deps: DependencyStatus[];
   onError: (message: string) => void;
+  /** The version running; null until it has been read. */
+  version: string | null;
   updateStatus: UpdateStatus;
   onCheckForUpdate: () => void;
 };
@@ -45,17 +45,10 @@ export function SettingsView({
   update,
   deps,
   onError,
+  version,
   updateStatus,
   onCheckForUpdate,
 }: Props) {
-  const [version, setVersion] = useState<string | null>(null);
-
-  useEffect(() => {
-    getVersion()
-      .then(setVersion)
-      .catch(() => {});
-  }, []);
-
   async function pickFolder() {
     const picked = await open({ directory: true, multiple: false });
     if (typeof picked === "string") update({ outDir: picked });
