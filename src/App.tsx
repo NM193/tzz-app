@@ -19,6 +19,7 @@ import { loadSettings, saveSettings, type Settings } from "./lib/settings";
 import { STAGE_LABEL, useJobs } from "./lib/useJobs";
 import { clock, useRecorder } from "./lib/useRecorder";
 import { ConvertView } from "./components/ConvertView";
+import { LanguagePrompt } from "./components/LanguagePrompt";
 import { LibraryView } from "./components/LibraryView";
 import { RecordView } from "./components/RecordView";
 import { SettingsView } from "./components/SettingsView";
@@ -40,6 +41,16 @@ export default function App() {
   const [links, setLinks] = useState<PendingLink[]>([]);
   const [dragging, setDragging] = useState(false);
   const [libraryVersion, setLibraryVersion] = useState(0);
+  /** Files waiting to be told their language before they join the queue. */
+  const [asking, setAsking] = useState<string[]>([]);
+
+  // Every way a file reaches the queue comes through here, so every file is
+  // asked about. A functional update: the drop listener and the recorder hold
+  // on to the first render's copy of this function.
+  function transcribe(paths: string[]) {
+    if (paths.length === 0) return;
+    setAsking((prev) => [...prev, ...paths.filter((path) => !prev.includes(path))]);
+  }
 
   const jobs = useJobs(settings);
   // The results list, shared: the hook measures it for the column re-flow.
@@ -109,10 +120,10 @@ export default function App() {
     setHit((at) => (at + by + found.total) % found.total);
   }
   const recorder = useRecorder({
-    // A finished recording joins the queue like any dropped file.
+    // A finished recording is asked about like any dropped file.
     onSaved: (path) => {
       setView("convert");
-      void jobs.enqueue([fileItem(path)]);
+      transcribe([path]);
     },
     onError: jobs.setError,
   });
@@ -154,7 +165,7 @@ export default function App() {
     document.documentElement.dataset.aurora = settings.aurora;
   }, [settings.tint, settings.aurora]);
 
-  // Files dropped anywhere on the window start straight away.
+  // Files dropped anywhere on the window are asked about first.
   useEffect(() => {
     const unlisten = getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "over") {
@@ -165,7 +176,7 @@ export default function App() {
         setDragging(false);
         if (event.payload.paths.length > 0) {
           setView("convert");
-          void jobs.enqueue(event.payload.paths.map((path) => fileItem(path)));
+          transcribe(event.payload.paths);
         }
       }
     });
@@ -313,11 +324,12 @@ export default function App() {
             onAddLinks={addLinks}
             onRemoveLink={(id) => setLinks((prev) => prev.filter((l) => l.id !== id))}
             onClearLinks={() => setLinks([])}
+            onTranscribe={transcribe}
             dragging={dragging}
             blocked={blocked}
           />
         )}
-        {view === "record" && <RecordView recorder={recorder} jobs={jobs} />}
+        {view === "record" && <RecordView recorder={recorder} onTranscribe={transcribe} />}
         {view === "library" &&
           (reading ? (
             <ReaderView
@@ -359,6 +371,19 @@ export default function App() {
           />
         )}
       </main>
+
+      {asking.length > 0 && (
+        <LanguagePrompt
+          paths={asking}
+          whisperModelPath={settings.whisperModelPath || null}
+          fallback={settings.transcriptLangs[0] ?? "sr"}
+          onConfirm={(files) => {
+            setAsking([]);
+            void jobs.enqueue(files.map((file) => fileItem(file.path, file.language)));
+          }}
+          onCancel={() => setAsking([])}
+        />
+      )}
     </div>
   );
 }

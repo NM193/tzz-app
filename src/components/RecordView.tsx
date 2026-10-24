@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { openBlackholePage, revealInFileManager } from "../lib/api";
-import { fileItem } from "../lib/queue";
-import type { Jobs } from "../lib/useJobs";
 import { clock, type Recorder } from "../lib/useRecorder";
 import { Player } from "./Player";
 
@@ -9,10 +7,11 @@ const SEGMENTS = 40;
 
 type Props = {
   recorder: Recorder;
-  jobs: Jobs;
+  /** Transcribe a saved recording: it is asked about before it queues. */
+  onTranscribe: (paths: string[]) => void;
 };
 
-export function RecordView({ recorder, jobs }: Props) {
+export function RecordView({ recorder, onTranscribe }: Props) {
   const lit = Math.round(recorder.level * SEGMENTS);
   // One at a time: the player is mounted for whichever recording is playing.
   const [playing, setPlaying] = useState<string | null>(null);
@@ -147,7 +146,7 @@ export function RecordView({ recorder, jobs }: Props) {
                     <button
                       type="button"
                       className="icon-button"
-                      onClick={() => void jobs.enqueue([fileItem(path)])}
+                      onClick={() => onTranscribe([path])}
                     >
                       Transcribe
                     </button>

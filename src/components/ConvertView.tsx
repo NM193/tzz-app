@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { errorMessage, openOutputFolder, revealInFileManager } from "../lib/api";
-import { fileItem, urlItem, type Pasted, type PendingLink } from "../lib/queue";
+import { urlItem, type Pasted, type PendingLink } from "../lib/queue";
 import { libraryLabel, type Settings } from "../lib/settings";
 import { STAGE_LABEL, type Jobs } from "../lib/useJobs";
 import { Check } from "./Controls";
@@ -20,6 +20,8 @@ type Props = {
   onAddLinks: (pasted: Pasted[]) => void;
   onRemoveLink: (id: string) => void;
   onClearLinks: () => void;
+  /** Transcribe files on disk: they are asked about before they queue. */
+  onTranscribe: (paths: string[]) => void;
   dragging: boolean;
   blocked: string | null;
 };
@@ -36,6 +38,7 @@ export function ConvertView({
   onAddLinks,
   onRemoveLink,
   onClearLinks,
+  onTranscribe,
   dragging,
   blocked,
 }: Props) {
@@ -58,7 +61,7 @@ export function ConvertView({
       filters: [{ name: "Audio or video", extensions: FILE_EXTENSIONS }],
     });
     const paths = Array.isArray(picked) ? picked : picked ? [picked] : [];
-    if (paths.length > 0) void jobs.enqueue(paths.map((path) => fileItem(path)));
+    onTranscribe(paths);
   }
 
   async function chooseFolder() {
