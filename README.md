@@ -41,6 +41,9 @@ This is needed only once. Updates arrive inside the app afterwards.
   as fast as Small.
 - **BlackHole**, only to record the Mac's own sound, for example a call. It
   has to be installed by hand; **Record** links to it when it is missing.
+  Then, in **Audio MIDI Setup**, make a **Multi-Output Device** with your
+  speakers or headphones and BlackHole in it. The app switches the sound to it
+  while recording and back afterwards.
 
 ### Updates
 

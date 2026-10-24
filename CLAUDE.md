@@ -18,7 +18,7 @@ macOS ties permissions and settings to it.
 - External CLIs: yt-dlp, ffmpeg, whisper-cli (whisper.cpp)
 - `genpdf` for PDF output
 - A Swift OCR helper using Apple's Vision, compiled by `build.rs` and embedded
-- Hand-written CoreAudio FFI for switching the sound output
+- Hand-written CoreAudio FFI for switching the sound output and reading inputs
 
 **`swiftc` is required to build** (`xcode-select --install`).
 
@@ -32,7 +32,7 @@ macOS ties permissions and settings to it.
     parsing and formatting · `document` parsing one back for the reader ·
     `screen` reading text off video · `pdf` ·
     `combine` stitching a queue into one document · `notes` your own notes,
-    kept per chapter · `recorder` ·
+    kept per chapter · `recorder` · `capture` reading an input ·
     `audio_output` CoreAudio · `tray` the menu bar icon · `cancel` stopping a
     job and deleting what it wrote · `library` reading the output folder ·
     `thumb` one picture per folder · `glass` the frosted window ·
@@ -96,9 +96,21 @@ These were bugs. The comments in the code say the same; this is the index.
   need "show only what is new", or the output triples in size and says less.
 - **Screens belong to exactly one paragraph.** Paragraphs break at chapter
   boundaries as well as minutes, so a fixed 60-second window double-counts.
-- **A killed app orphans ffmpeg.** The recorder writes its pid beside the
-  recording; the next launch stops what was left running and puts the sound
-  output back.
+- **A killed app used to orphan ffmpeg.** Now ffmpeg reads from pipes that
+  close with the app, so it finishes the file and exits by itself. The pid
+  written beside the recording is a backstop: the next launch stops that
+  process only if it is still ffmpeg writing into the recording folder, since
+  by then the number may belong to anything, and puts the sound output back.
+- **ffmpeg's avfoundation input drops audio.** It holds one buffer and looks
+  for the next every 10 ms; at 48 kHz CoreAudio delivers one every 10.7 ms,
+  and about one in ten was overwritten unread -- 6-10% of every recording,
+  in 512-sample slices. The app reads inputs itself with an AudioQueue and
+  hands ffmpeg plain samples.
+- **BlackHole runs at the Multi-Output Device's rate, or the recording is
+  garbage.** A Multi-Output Device does not set the rate of the devices in
+  it, and drift correction cannot bridge 44.1 to 48 kHz: the recording came
+  out 9% fast, twice as loud and torn. The app sets the input's rate before
+  it starts recording.
 - **OCR is cached** in `screens.json` beside the video. Reading an hour costs
   twelve minutes and never changes.
 - **A playlist link is `/playlist?list=`, and nothing else.** A watch link
@@ -254,6 +266,6 @@ Not built: Windows support.
 - `npm run install:app` -- build and replace the copy in /Applications
 - `npm run build:vite` -- typecheck the frontend only
 - `bash scripts/fetch-tools.sh` -- put the external tools inside the app
-- `cd src-tauri && cargo test` -- 97 tests, all pure logic
+- `cd src-tauri && cargo test` -- 105 tests, all pure logic
 - `python3 scripts/test_changelog.py` -- the release notes reader
 - `node --test src/lib/releaseNotes.test.ts` -- what the update notice shows
