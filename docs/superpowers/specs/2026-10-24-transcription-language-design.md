@@ -68,6 +68,10 @@ LISTENING…                       [ Serbian ] [ English ]
   (`transcriptLangs[0]`). No new setting. The transcription then reports its
   own error as it does today, for instance that no model is chosen.
 - **Cancel** transcribes nothing. A recording stays saved where it is.
+- **Transcribe waits** until every row has a guess or a choice made by hand,
+  so Enter cannot send a file off on the fallback while Whisper is still
+  listening. A guess that has not come back after 60 s is given up on and the
+  row reads `NOT DETECTED`.
 - **Transcribe** queues every row with its language. The transcript's header
   then says `Transcript from: whisper (sr)`, not `whisper (auto)`; the header
   already prints whatever language it is given.

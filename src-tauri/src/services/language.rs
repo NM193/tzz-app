@@ -11,6 +11,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use serde::Serialize;
 use tokio::process::Command;
@@ -19,6 +20,10 @@ use super::binaries;
 
 /// All Whisper listens to when it guesses, so all there is to cut.
 const EXCERPT_SECONDS: f64 = 30.0;
+
+/// A guess takes a second or three. One that has not come back by now never
+/// will, and the dialog waits for it before it lets you transcribe.
+const GIVE_UP: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,7 +93,13 @@ pub async fn detect(audio_path: &Path, model_path: &Path) -> Result<Detected, St
     let start = excerpt_start(parse_duration(&String::from_utf8_lossy(&probe.stderr)));
 
     let excerpt = excerpt_path();
-    let heard = listen(&ffmpeg, &whisper, audio_path, model_path, &excerpt, start).await;
+    // Running out of time drops `listen`, and with it the children it started.
+    let heard = tokio::time::timeout(
+        GIVE_UP,
+        listen(&ffmpeg, &whisper, audio_path, model_path, &excerpt, start),
+    )
+    .await
+    .unwrap_or_else(|_| Err("Whisper took too long to tell which language this is.".to_string()));
     let _ = std::fs::remove_file(&excerpt);
     heard
 }

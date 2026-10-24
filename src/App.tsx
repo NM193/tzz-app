@@ -376,7 +376,8 @@ export default function App() {
         <LanguagePrompt
           paths={asking}
           whisperModelPath={settings.whisperModelPath || null}
-          fallback={settings.transcriptLangs[0] ?? "sr"}
+          // The dialog offers Serbian and English; a fallback must be one of them.
+          fallback={settings.transcriptLangs[0] === "en" ? "en" : "sr"}
           onConfirm={(files) => {
             setAsking([]);
             void jobs.enqueue(files.map((file) => fileItem(file.path, file.language)));

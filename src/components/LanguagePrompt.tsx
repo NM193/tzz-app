@@ -29,8 +29,12 @@ type Row = {
  * Which language each file is spoken in, asked before it is transcribed.
  *
  * Whisper's guess is shown and selected, never trusted: on 2026-10-24 Serbian
- * over music came back as English. One file is heard at a time, so two
- * Whisper processes never compete for the GPU.
+ * over music came back as English. One file is heard at a time, so the dialog
+ * never runs two Whispers at once (a guess still under way when you confirm
+ * may overlap the transcription for a moment; accepted).
+ *
+ * Transcribe waits until every row has a guess or a choice of yours, so Enter
+ * cannot send a file off on the fallback while Whisper is still listening.
  */
 export function LanguagePrompt({ paths, whisperModelPath, fallback, onConfirm, onCancel }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -50,6 +54,7 @@ export function LanguagePrompt({ paths, whisperModelPath, fallback, onConfirm, o
   }, [paths, fallback]);
 
   const listening = rows.find((row) => row.detected === undefined)?.path ?? null;
+  const ready = rows.length > 0 && rows.every((row) => row.detected !== undefined || row.picked);
 
   useEffect(() => {
     if (!listening || asked.current.has(listening)) return;
@@ -75,9 +80,15 @@ export function LanguagePrompt({ paths, whisperModelPath, fallback, onConfirm, o
   }, [listening, whisperModelPath]);
 
   useEffect(() => {
-    if (sheet.current) sheetEnter(sheet.current);
-    go.current?.focus();
+    if (!sheet.current) return;
+    sheetEnter(sheet.current);
+    sheet.current.focus();
   }, []);
+
+  // Enter confirms once there is something worth confirming.
+  useEffect(() => {
+    if (ready) go.current?.focus();
+  }, [ready]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -98,6 +109,7 @@ export function LanguagePrompt({ paths, whisperModelPath, fallback, onConfirm, o
       <div
         ref={sheet}
         className="prompt__sheet"
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="prompt-title"
@@ -123,6 +135,7 @@ export function LanguagePrompt({ paths, whisperModelPath, fallback, onConfirm, o
             ref={go}
             type="button"
             className="cta cta--small"
+            disabled={!ready}
             onClick={() => onConfirm(rows.map(({ path, choice }) => ({ path, language: choice })))}
           >
             Transcribe

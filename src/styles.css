@@ -2336,6 +2336,11 @@ mark {
   background: var(--card);
 }
 
+/* Focused only so Escape and Tab start inside it; nothing to show. */
+.prompt__sheet:focus {
+  outline: none;
+}
+
 .prompt__title {
   margin: 0 0 1rem;
   font: 400 1.75rem/1.1 var(--font-serif);
