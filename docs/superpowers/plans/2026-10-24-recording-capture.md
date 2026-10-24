@@ -263,15 +263,22 @@ fn a_second_input_arrives_on_descriptor_three() {
 
 ### Task 5: Prove it on the real thing
 
-- [ ] **Step 1: test-runner** -- cargo test, build:vite, the Python and Node
+- [x] **Step 1: test-runner** -- cargo test, build:vite, the Python and Node
   tests.
-- [ ] **Step 2: Ask the owner**, then `npm run install:app`.
-- [ ] **Step 3: The three-tone test** through the installed app (watcher
-  pattern `MacOS/ffmpeg -f f32le`), parts A, B and C as on 2026-10-24.
+- [x] **Step 2: Ask the owner**, then `npm run install:app`.
+- [x] **Step 3: The three-tone test** through the installed app (watcher
+  pattern `MacOS/ffmpeg .*-f f32le` -- the args start with `-probesize`),
+  parts A, B and C as on 2026-10-24.
   Expected: no seams in any part, recorded length equal to the wall clock
   within 0.1 s, pitch 1.0000, level about 2508.
-- [ ] **Step 4: The microphone** -- the owner records ten seconds of speech
-  and listens; length against the wall clock.
-- [ ] **Step 5: Two inputs** -- BlackHole and the microphone together;
-  length against the wall clock, and the owner listens.
-- [ ] **Step 6: reviewer** on the diff.
+  Result: BlackHole set to 44.1 kHz beforehand, the app moved it to 48 kHz;
+  pitch 1.0000; the 5 s tone measured 4.6996 s between its half-amplitude
+  fades against 4.6999 s played; length against the wall clock +0.07 s.
+  Only part A reached BlackHole: a monitor plugged in moved the audiotoolbox
+  indices, so B and C went elsewhere. Look devices up by name next time.
+- [x] **Step 4: The microphone** -- the owner records ten seconds of speech
+  and listens; length against the wall clock. Result: +0.06 s, sounds right.
+- [x] **Step 5: Two inputs** -- BlackHole and the microphone together;
+  length against the wall clock, and the owner listens. Result: +0.09 s,
+  BlackHole again moved from 44.1 to 48 kHz, sounds right.
+- [x] **Step 6: reviewer** on the diff.
