@@ -30,6 +30,8 @@ WORK="build"
 TARGET="$(rustc -vV | sed -n 's/^host: //p')"
 
 mkdir -p "$OUT" "$WORK"
+# Progress goes to stdout and why it stopped to stderr, because a release runs
+# this with stdout thrown away.
 say() { printf '\n== %s\n' "$1"; }
 
 # The oldest macOS the app supports, from the one place it is set. Every tool
@@ -100,7 +102,7 @@ fetch_ffmpeg() {
 # The result is about five megabytes and needs nothing but macOS itself.
 build_whisper() {
   if ! command -v cmake > /dev/null; then
-    echo "   cmake is needed to build it: brew install cmake"
+    echo "   cmake is needed to build it: brew install cmake" >&2
     exit 1
   fi
 
@@ -134,8 +136,8 @@ build_whisper() {
   left="$(otool -L "$OUT/whisper-cli-$TARGET" | awk 'NR>1 {print $1}' \
     | grep -vE "^\s*(/usr/lib|/System)" || true)"
   if [ -n "$left" ]; then
-    echo "   still needs something from outside:"
-    echo "$left" | sed 's/^/     /'
+    echo "   still needs something from outside:" >&2
+    echo "$left" | sed 's/^/     /' >&2
     exit 1
   fi
   echo "   self-contained"
@@ -153,7 +155,7 @@ have whisper-cli --help && echo "   already here" || build_whisper
 say "macOS $MIN"
 for name in yt-dlp ffmpeg whisper-cli; do
   if ! runs_on_min "$OUT/$name-$TARGET"; then
-    echo "   $name asks for macOS $(minos "$OUT/$name-$TARGET"), newer than the app's $MIN"
+    echo "   $name asks for macOS $(minos "$OUT/$name-$TARGET"), newer than the app's $MIN" >&2
     exit 1
   fi
 done
