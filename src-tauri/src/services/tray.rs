@@ -107,10 +107,14 @@ pub fn toggle(app: &AppHandle) {
     } else {
         let index = selected_input(app).or_else(first_input).unwrap_or(0);
         let second = second_input(app);
-        match_rate_for(app, index);
+        // The Mac's sound may be either input: "the call and me" picks two.
+        let inputs: Vec<u32> = std::iter::once(index).chain(second).collect();
+        for &input in &inputs {
+            match_rate_for(app, input);
+        }
         match recorder::start(app, &state, index, second, &recording_temp_dir()) {
             Ok(()) => {
-                route_output_for(app, index);
+                route_output_for(app, &inputs);
                 let _ = app.emit("recording://started", index);
             }
             Err(message) => {
@@ -141,12 +145,12 @@ pub fn refresh(app: &AppHandle) {
 
 /// Send the Mac's sound through the Multi-Output Device while recording.
 ///
-/// Only when the chosen input is a capture driver: recording the microphone has
+/// Only when a chosen input is a capture driver: recording the microphone has
 /// nothing to do with where sound comes out, and switching would be rude.
 /// The Multi-Output Device is left unselected the rest of the time because it
 /// disables the volume keys.
-fn route_output_for(app: &AppHandle, input_index: u32) {
-    if !captures_system_audio(input_index) {
+fn route_output_for(app: &AppHandle, inputs: &[u32]) {
+    if !inputs.iter().any(|&input| captures_system_audio(input)) {
         return;
     }
     let Some((device, name)) = audio_output::find_multi_output() else {
@@ -230,7 +234,8 @@ fn match_rate_for(app: &AppHandle, input_index: u32) {
         return;
     }
 
-    if audio_output::set_nominal_rate(input_index, wanted).is_err() {
+    let changed = audio_output::set_nominal_rate(input_index, wanted).is_ok() && rate_settles(input_index, wanted);
+    if !changed {
         let _ = app.emit(
             "recording://error",
             format!(
@@ -241,6 +246,20 @@ fn match_rate_for(app: &AppHandle, input_index: u32) {
             ),
         );
     }
+}
+
+/// A driver like BlackHole takes a new rate when CoreAudio gets round to it,
+/// not when asked (AudioServerPlugIn.h). The recording reads the rate next, to
+/// tell ffmpeg what is coming, so this waits until the device says it -- a
+/// second at most.
+fn rate_settles(device: u32, wanted: f64) -> bool {
+    for _ in 0..100 {
+        if audio_output::nominal_rate(device).is_some_and(|rate| (rate - wanted).abs() < 0.5) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    false
 }
 
 fn captures_system_audio(input_index: u32) -> bool {
