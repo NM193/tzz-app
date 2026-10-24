@@ -420,8 +420,13 @@ async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Re
 
     // The original stays exactly where it is, untouched. Everything this job
     // makes goes into a folder of its own in the library, as a download's does.
-    let name = combine::sanitise(&title);
-    let job_dir = library_folder(&out_dir, &name)?;
+    let job_dir = library_folder(&out_dir, &combine::sanitise(&title))?;
+    let _hollow = RemoveIfEmpty(&job_dir);
+    // The files take the folder's name, shortened as it may have been.
+    let name = job_dir
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "Audio".to_string());
     let named = |extension: &str| job_dir.join(format!("{name}.{extension}"));
 
     let audio_path = if want_audio {
@@ -492,6 +497,7 @@ async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Re
         None => None,
     };
 
+    cancel::claim(&job_dir.join(thumb::POSTER));
     thumb::ensure_from(&job_dir, &path);
 
     ytdlp::emit(&app, ProgressEvent::stage("done", None));
@@ -783,6 +789,18 @@ pub(crate) fn resolve_out_dir(requested: Option<&str>) -> Result<PathBuf, String
 /// it is ten lectures, and the video is somewhere you can find it again.
 fn job_folder(out_dir: &std::path::Path, title: &str, video_id: &str) -> Result<PathBuf, String> {
     library_folder(out_dir, &format!("{} [{video_id}]", combine::sanitise(title)))
+}
+
+/// Removes a folder when dropped, if nothing was written into it: a job that
+/// fails before its first file leaves no hollow entry in the library. A
+/// folder with anything in it, finished or not, is left alone.
+struct RemoveIfEmpty<'a>(&'a std::path::Path);
+
+impl Drop for RemoveIfEmpty<'_> {
+    fn drop(&mut self) {
+        // remove_dir refuses a folder that is not empty, which is the point.
+        let _ = std::fs::remove_dir(self.0);
+    }
 }
 
 /// A folder of its own in the library, for a download or a file on disk.

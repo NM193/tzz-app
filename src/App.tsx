@@ -56,8 +56,15 @@ export default function App() {
   /** Files on disk wait on Convert as pills beside the links, for Start. */
   function addFiles(paths: string[]) {
     setLinks((prev) => {
+      // Once each, whether it was already waiting or dropped twice at once.
       const known = new Set(prev.map((l) => l.url));
-      return [...prev, ...paths.filter((path) => !known.has(path)).map(pendingFile)];
+      const fresh: PendingLink[] = [];
+      for (const path of paths) {
+        if (known.has(path)) continue;
+        known.add(path);
+        fresh.push(pendingFile(path));
+      }
+      return [...prev, ...fresh];
     });
   }
 

@@ -27,9 +27,25 @@ pub fn quality_args(choice: Option<&str>) -> [&'static str; 2] {
     }
 }
 
+/// Whether two paths name one file. By inode, not by name: the volume may
+/// ignore case, and then "Talk.MP3" and "Talk.mp3" are the same file.
+fn same_file(a: &Path, b: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    match (std::fs::metadata(a), std::fs::metadata(b)) {
+        (Ok(a), Ok(b)) => a.dev() == b.dev() && a.ino() == b.ino(),
+        _ => false,
+    }
+}
+
 /// Put an MP3 of `source` at `destination`. Claimed first, so a Stop takes
 /// back a half-written file.
 pub async fn keep(source: &Path, destination: &Path, quality: Option<&str>) -> Result<PathBuf, String> {
+    // An MP3 dropped from its own library folder is already where it belongs.
+    // Copying a file onto itself truncates it, and a Stop would then sweep the
+    // original away -- so it is neither copied nor claimed.
+    if same_file(source, destination) {
+        return Ok(destination.to_path_buf());
+    }
     cancel::claim(destination);
     if !needs_encoding(source) {
         tokio::fs::copy(source, destination)
@@ -77,6 +93,23 @@ mod tests {
         for name in ["lecture.mp4", "talk.m4a", "raw.wav", "noext"] {
             assert!(needs_encoding(Path::new(name)), "{name}");
         }
+    }
+
+    #[test]
+    fn a_file_is_recognised_as_itself_and_nothing_else() {
+        let dir = std::env::temp_dir().join(format!("tzz-mp3-same-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let talk = dir.join("Talk.mp3");
+        let other = dir.join("Other.mp3");
+        std::fs::write(&talk, b"talk").unwrap();
+        std::fs::write(&other, b"talk").unwrap();
+
+        assert!(same_file(&talk, &dir.join(".").join("Talk.mp3")));
+        assert!(!same_file(&talk, &other));
+        assert!(!same_file(&talk, &dir.join("Missing.mp3")));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
