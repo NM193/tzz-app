@@ -120,6 +120,12 @@ fn extract_frames(video: &Path, work_dir: &Path) -> Result<Vec<(u64, PathBuf)>, 
     // `-skip_frame nokey` decodes only keyframes, which turns a 13x realtime
     // pass into a 48x one. Sampling every other second is far finer than any
     // lecture changes its screen.
+    //
+    // Both ends used to go missing. The first screen has nothing before it to
+    // differ from, so `gt(scene)` never took it -- the title slide -- and
+    // `eq(n,0)` now does. And `fps` held the last keyframe back waiting for one
+    // after it that never came, losing the closing screen; `eof_action=pass`
+    // lets it through. Measured 2026-10-24: three slides read as one, now three.
     let child = Command::new(ffmpeg)
         .arg("-skip_frame")
         .arg("nokey")
@@ -127,7 +133,7 @@ fn extract_frames(video: &Path, work_dir: &Path) -> Result<Vec<(u64, PathBuf)>, 
         .arg(video)
         .arg("-vf")
         .arg(format!(
-            "fps=1/2,select='gt(scene,{SCENE_THRESHOLD})',scale=1400:-1,showinfo"
+            "fps=1/2:eof_action=pass,select='eq(n,0)+gt(scene,{SCENE_THRESHOLD})',scale=1400:-1,showinfo"
         ))
         .args(["-fps_mode", "vfr", "-q:v", "3"])
         .arg(frame_dir.join("frame_%04d.jpg"))
