@@ -339,9 +339,9 @@ async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Re
 
 Add `use crate::services::mp3;` beside the other service imports.
 
-- [ ] **Step 4: delete `transcript_path_for`** in `services/transcript.rs` (the function and its doc comment) and its two tests, `transcript_path_uses_the_plain_name_when_free` and `transcript_path_steps_aside_rather_than_overwrite`. Nothing else calls it: the library folder is the app's own, so a file there is the app's to replace.
+- [x] **Step 4: ~~delete `transcript_path_for`~~ -- wrong, kept.** `combine_transcripts` still names the combined document with it (`media.rs`, the queue's one document), so the function and its two tests stay.
 
-- [ ] **Step 5:** `cd src-tauri && cargo test` -- 117 pass (119 - 2), no warnings.
+- [x] **Step 5:** `cd src-tauri && cargo test` -- 119 pass, no warnings.
 
 - [ ] **Step 6: Commit** -- "Write what a file makes into its own folder in the library"
 
@@ -550,7 +550,7 @@ Run the test: PASS.
 
 ### Task 6: Prove it
 
-- [ ] test-runner: `cargo test` (117), `build:vite`, `test_changelog.py`, `node --test src/lib/*.test.ts`.
+- [ ] test-runner: `cargo test` (119), `build:vite`, `test_changelog.py`, `node --test src/lib/*.test.ts`.
 - [ ] reviewer on the diff since the plan's commit.
 - [ ] Ask the owner, then `npm run install:app`.
 - [ ] Owner: drop a video on Convert -> a pill, nothing starts; tick Read the screen, Start -> `Tzz Library/<name>/` holds `.md`, `.mp3`, `poster.jpg`, `.screens.json`; nothing new beside the original.

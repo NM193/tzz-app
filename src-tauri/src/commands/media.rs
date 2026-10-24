@@ -12,6 +12,7 @@ use crate::services::combine::{self, Section};
 use crate::services::language::{self, Detected};
 use crate::services::pdf;
 use crate::services::model::{self, Model};
+use crate::services::mp3;
 use crate::services::screen;
 use crate::services::thumb;
 use crate::services::transcript::{self, Screen, Transcript, TranscriptHeader};
@@ -67,6 +68,14 @@ pub struct LocalFileRequest {
     pub transcript_format: Option<String>,
     /// Also read the text that appears on screen, for a video file.
     pub read_screen: Option<bool>,
+    /// Absolute folder path. Defaults to the library when empty.
+    pub out_dir: Option<String>,
+    /// An MP3 of the file in its library folder. Defaults to true.
+    pub want_audio: Option<bool>,
+    /// Defaults to true; Record always asks for one.
+    pub want_transcript: Option<bool>,
+    /// "v0" | "320", as for a download.
+    pub audio_quality: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -380,93 +389,119 @@ pub async fn transcribe_file(app: AppHandle, request: LocalFileRequest) -> Resul
 async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Result<JobResult, String> {
     let app = app.clone();
     let path = validate_audio_path(&request.path)?;
-
-    let model_path = request
-        .whisper_model_path
-        .as_deref()
-        .map(str::trim)
-        .filter(|p| !p.is_empty())
-        .ok_or_else(|| "Choose a Whisper model under Options first.".to_string())?;
-
-    if binaries::resolve("whisper-cli").is_none() && binaries::resolve("whisper-cpp").is_none() {
-        return Err(
-            "whisper-cli is not installed. Install it with: brew install whisper-cpp".to_string(),
-        );
+    let out_dir = resolve_out_dir(request.out_dir.as_deref())?;
+    let want_audio = request.want_audio.unwrap_or(true);
+    let want_transcript = request.want_transcript.unwrap_or(true);
+    if !want_audio && !want_transcript {
+        return Err("Choose audio or a transcript to keep.".to_string());
     }
+
+    let model_path = if want_transcript {
+        let model = request
+            .whisper_model_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+            .ok_or_else(|| "Choose a Whisper model under Options first.".to_string())?;
+        if binaries::resolve("whisper-cli").is_none() && binaries::resolve("whisper-cpp").is_none() {
+            return Err(
+                "whisper-cli is not installed. Install it with: brew install whisper-cpp".to_string(),
+            );
+        }
+        Some(PathBuf::from(model))
+    } else {
+        None
+    };
 
     let title = path
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "Audio".to_string());
-    let language = request
-        .language
-        .as_deref()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .unwrap_or("auto")
-        .to_string();
 
-    ytdlp::emit(&app, ProgressEvent::stage("transcribing", Some(title.clone())));
+    // The original stays exactly where it is, untouched. Everything this job
+    // makes goes into a folder of its own in the library, as a download's does.
+    let name = combine::sanitise(&title);
+    let job_dir = library_folder(&out_dir, &name)?;
+    let named = |extension: &str| job_dir.join(format!("{name}.{extension}"));
 
-    let screens = if request.read_screen.unwrap_or(false) && has_picture(&path) {
-        screen::read_screens(&app, &path, &screen::cache_path(&path), &screens_work_dir()).unwrap_or_default()
+    let audio_path = if want_audio {
+        ytdlp::emit(&app, ProgressEvent::stage("converting", Some(title.clone())));
+        Some(mp3::keep(&path, &named("mp3"), request.audio_quality.as_deref()).await?)
     } else {
-        Vec::new()
+        None
     };
     cancel::check()?;
 
-    ytdlp::emit(&app, ProgressEvent::stage("transcribing", Some(title.clone())));
+    let transcript = match model_path {
+        Some(model_path) => {
+            let language = request
+                .language
+                .as_deref()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .unwrap_or("auto")
+                .to_string();
+            let read_screen = request.read_screen.unwrap_or(false);
 
-    // The only files this job writes; a stop takes them back.
-    cancel::claim(&transcript::transcript_path_for(&path, "md"));
-    cancel::claim(&transcript::transcript_path_for(&path, "pdf"));
+            ytdlp::emit(&app, ProgressEvent::stage("transcribing", Some(title.clone())));
+            let screens = if read_screen && has_picture(&path) {
+                screen::read_screens(&app, &path, &named("screens.json"), &screens_work_dir())
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+            cancel::check()?;
 
-    let srt = transcript::whisper_srt(&app, &path, &PathBuf::from(model_path), &language).await?;
-    let cues = transcript::parse_srt(&srt);
-    if cues.is_empty() {
-        return Err("The transcript came back empty.".to_string());
-    }
+            ytdlp::emit(&app, ProgressEvent::stage("transcribing", Some(title.clone())));
+            cancel::claim(&named("md"));
+            cancel::claim(&named("pdf"));
 
-    let files = write_transcript_outputs(
-        &transcript::transcript_path_for(&path, "md"),
-        &transcript::transcript_path_for(&path, "pdf"),
-        request.transcript_format.as_deref(),
-        &TranscriptHeader {
-            title: &title,
-            url: &path.to_string_lossy(),
-            uploader: None,
-            duration_seconds: None,
-            source: "whisper",
-            language: Some(&language),
-            read_screen: request.read_screen.unwrap_or(false),
-        },
-        &cues,
-        &screens,
-        &[],
-    )?;
+            let srt = transcript::whisper_srt(&app, &path, &model_path, &language).await?;
+            let cues = transcript::parse_srt(&srt);
+            if cues.is_empty() {
+                return Err("The transcript came back empty.".to_string());
+            }
 
-    if let Some(folder) = path.parent() {
-        thumb::ensure(folder);
-    }
+            let files = write_transcript_outputs(
+                &named("md"),
+                &named("pdf"),
+                request.transcript_format.as_deref(),
+                &TranscriptHeader {
+                    title: &title,
+                    url: &path.to_string_lossy(),
+                    uploader: None,
+                    duration_seconds: None,
+                    source: "whisper",
+                    language: Some(&language),
+                    read_screen,
+                },
+                &cues,
+                &screens,
+                &[],
+            )?;
+
+            Some(Transcript {
+                text: transcript::cues_to_plain_text(&cues),
+                source: "whisper".to_string(),
+                language: Some(language),
+                file_path: files.markdown_path,
+                pdf_path: files.pdf_path,
+                markdown: Some(files.markdown),
+            })
+        }
+        None => None,
+    };
+
+    thumb::ensure_from(&job_dir, &path);
 
     ytdlp::emit(&app, ProgressEvent::stage("done", None));
 
     Ok(JobResult {
         title,
-        folder: path
-            .parent()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_default(),
-        audio_path: Some(path.to_string_lossy().into_owned()),
+        folder: job_dir.to_string_lossy().into_owned(),
+        audio_path: audio_path.map(|p| p.to_string_lossy().into_owned()),
         video_path: None,
-        transcript: Some(Transcript {
-            text: transcript::cues_to_plain_text(&cues),
-            source: "whisper".to_string(),
-            language: Some(language),
-            file_path: files.markdown_path,
-            pdf_path: files.pdf_path,
-                markdown: Some(files.markdown),
-        }),
+        transcript,
         warnings: Vec::new(),
     })
 }
@@ -747,7 +782,11 @@ pub(crate) fn resolve_out_dir(requested: Option<&str>) -> Result<PathBuf, String
 /// formats. Ten of them loose in a folder is forty files; in their own folders
 /// it is ten lectures, and the video is somewhere you can find it again.
 fn job_folder(out_dir: &std::path::Path, title: &str, video_id: &str) -> Result<PathBuf, String> {
-    let name = format!("{} [{video_id}]", combine::sanitise(title));
+    library_folder(out_dir, &format!("{} [{video_id}]", combine::sanitise(title)))
+}
+
+/// A folder of its own in the library, for a download or a file on disk.
+fn library_folder(out_dir: &std::path::Path, name: &str) -> Result<PathBuf, String> {
     // 120 bytes keeps the whole path clear of the 255-byte filename limit.
     let trimmed: String = name.chars().take(120).collect();
 
@@ -755,7 +794,7 @@ fn job_folder(out_dir: &std::path::Path, title: &str, video_id: &str) -> Result<
     // Claimed before it is made, so a stop knows whether it was ours to remove.
     cancel::claim(&folder);
     std::fs::create_dir_all(&folder)
-        .map_err(|e| format!("Could not create a folder for this video: {e}"))?;
+        .map_err(|e| format!("Could not create a folder in the library: {e}"))?;
     Ok(folder)
 }
 
