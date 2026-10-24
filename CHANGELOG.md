@@ -9,10 +9,13 @@ it, not about the code.
 ### New
 
 ### Improved
-- The version you have is shown under the status in the sidebar, with a quiet
-  note there when a newer one is out.
 
 ### Fixed
+
+## 0.3.2 — 2026-10-24
+
+### Improved
+- The version you have is shown under the status in the sidebar, with a quiet note there when a newer one is out.
 
 ## 0.3.1 — 2026-10-24
 
