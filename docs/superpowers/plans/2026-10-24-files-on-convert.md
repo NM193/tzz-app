@@ -550,8 +550,23 @@ Run the test: PASS.
 
 ### Task 6: Prove it
 
-- [ ] test-runner: `cargo test` (119), `build:vite`, `test_changelog.py`, `node --test src/lib/*.test.ts`.
-- [ ] reviewer on the diff since the plan's commit.
-- [ ] Ask the owner, then `npm run install:app`.
-- [ ] Owner: drop a video on Convert -> a pill, nothing starts; tick Read the screen, Start -> `Tzz Library/<name>/` holds `.md`, `.mp3`, `poster.jpg`, `.screens.json`; nothing new beside the original.
-- [ ] Owner: Transcribe a recording from Record -> the dialog, then a folder in the library.
+- [x] test-runner: `cargo test` (119), `build:vite`, `test_changelog.py`, `node --test src/lib/*.test.ts`.
+  After the review fixes: 120 Rust, 10 Node.
+- [x] reviewer on the diff since the plan's commit. Fixed: an MP3 copied onto
+  itself (same file, by inode), files named after the possibly shortened
+  folder, an empty folder removed after a failure, the poster claimed for
+  Stop, a file dropped twice at once waiting once.
+- [x] Ask the owner, then `npm run install:app`.
+- [x] Driven through Accessibility on the installed app (2026-10-24, with the
+  owner's leave): Choose a file -> a pill, "1 ready", status Ready; Read the
+  screen + English, Convert -> `Tzz Library/Probni video/` with `.md`,
+  `.pdf`, `.mp3`, `poster.jpg`, `.screens.json`, `whisper (en)`, the text
+  right; the original's folder unchanged; both runs listed in Library;
+  Settings shows "Tzz App 0.2.0", Check for updates answers "This is the
+  newest version." Options restored and the test folders removed after.
+  Found, not caused by this work: frame picking (`select=gt(scene,0.06)` on
+  keyframes) never reads a video's first screen and missed one of three
+  contrasting slides. Its own task.
+- [ ] Owner: Transcribe a recording from Record -- not run: the installed
+  app lists no recording this session. Same `transcribe_file` path as above,
+  plus `wantTranscript: true`.
