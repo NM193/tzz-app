@@ -3,7 +3,7 @@ name = "yt-mp3"
 version = "0.1.0"
 description = "YouTube to MP3 with transcript"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.87"
 
 [lib]
 name = "yt_mp3_lib"
