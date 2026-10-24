@@ -51,7 +51,7 @@ export function LinkField({ links, onAdd, onRemove, disabled }: Props) {
           <button
             type="button"
             className="pill__remove"
-            aria-label="Remove link"
+            aria-label={link.file ? "Remove file" : "Remove link"}
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();

@@ -169,23 +169,6 @@ export function SettingsView({ settings, update, deps, onError }: Props) {
         <h2>Transcription</h2>
 
         <Setting
-          title="Caption language to try first"
-          hint="The original track always wins over a machine translation."
-        >
-          <Segmented<string>
-            label="Caption language"
-            value={settings.transcriptLangs[0] ?? "sr"}
-            onChange={(lang) =>
-              update({ transcriptLangs: lang === "sr" ? ["sr", "en"] : ["en", "sr"] })
-            }
-            options={[
-              { value: "sr", label: "Serbian" },
-              { value: "en", label: "English" },
-            ]}
-          />
-        </Setting>
-
-        <Setting
           title="Whisper model"
           hint={
             settings.whisperModelPath ||

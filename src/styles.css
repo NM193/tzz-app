@@ -549,6 +549,11 @@ mark {
   align-content: start;
 }
 
+/* The language spoken, under the transcript's ticks. */
+.opts__language {
+  margin-top: 0.75rem;
+}
+
 .checks button {
   display: flex;
   align-items: center;

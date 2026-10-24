@@ -10,6 +10,7 @@ import {
   fileItem,
   isPlaylist,
   knownLink,
+  pendingFile,
   pendingLink,
   type Pasted,
   type PendingLink,
@@ -41,15 +42,23 @@ export default function App() {
   const [links, setLinks] = useState<PendingLink[]>([]);
   const [dragging, setDragging] = useState(false);
   const [libraryVersion, setLibraryVersion] = useState(0);
-  /** Files waiting to be told their language before they join the queue. */
+  /** Recordings waiting to be told their language before they join the queue. */
   const [asking, setAsking] = useState<string[]>([]);
 
-  // Every way a file reaches the queue comes through here, so every file is
-  // asked about. A functional update: the drop listener and the recorder hold
-  // on to the first render's copy of this function.
+  // A recording from Record is asked which language it is spoken in first.
+  // Functional updates, here and in addFiles: the drop listener and the
+  // recorder hold on to the first render's copy of these functions.
   function transcribe(paths: string[]) {
     if (paths.length === 0) return;
     setAsking((prev) => [...prev, ...paths.filter((path) => !prev.includes(path))]);
+  }
+
+  /** Files on disk wait on Convert as pills beside the links, for Start. */
+  function addFiles(paths: string[]) {
+    setLinks((prev) => {
+      const known = new Set(prev.map((l) => l.url));
+      return [...prev, ...paths.filter((path) => !known.has(path)).map(pendingFile)];
+    });
   }
 
   const jobs = useJobs(settings);
@@ -165,7 +174,7 @@ export default function App() {
     document.documentElement.dataset.aurora = settings.aurora;
   }, [settings.tint, settings.aurora]);
 
-  // Files dropped anywhere on the window are asked about first.
+  // Files dropped anywhere on the window wait on Convert, beside the links.
   useEffect(() => {
     const unlisten = getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "over") {
@@ -176,7 +185,7 @@ export default function App() {
         setDragging(false);
         if (event.payload.paths.length > 0) {
           setView("convert");
-          transcribe(event.payload.paths);
+          addFiles(event.payload.paths);
         }
       }
     });
@@ -324,7 +333,7 @@ export default function App() {
             onAddLinks={addLinks}
             onRemoveLink={(id) => setLinks((prev) => prev.filter((l) => l.id !== id))}
             onClearLinks={() => setLinks([])}
-            onTranscribe={transcribe}
+            onAddFiles={addFiles}
             dragging={dragging}
             blocked={blocked}
           />
@@ -380,7 +389,7 @@ export default function App() {
           fallback={settings.transcriptLangs[0] === "en" ? "en" : "sr"}
           onConfirm={(files) => {
             setAsking([]);
-            void jobs.enqueue(files.map((file) => fileItem(file.path, file.language)));
+            void jobs.enqueue(files.map((file) => fileItem(file.path, file.language, true)));
           }}
           onCancel={() => setAsking([])}
         />

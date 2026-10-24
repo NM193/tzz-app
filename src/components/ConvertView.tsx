@@ -1,9 +1,9 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { errorMessage, openOutputFolder, revealInFileManager } from "../lib/api";
-import { urlItem, type Pasted, type PendingLink } from "../lib/queue";
+import { fileItem, urlItem, type Pasted, type PendingLink } from "../lib/queue";
 import { libraryLabel, type Settings } from "../lib/settings";
 import { STAGE_LABEL, type Jobs } from "../lib/useJobs";
-import { Check } from "./Controls";
+import { Check, Segmented } from "./Controls";
 import { LinkField } from "./LinkField";
 import { QueueList } from "./QueueList";
 
@@ -20,8 +20,8 @@ type Props = {
   onAddLinks: (pasted: Pasted[]) => void;
   onRemoveLink: (id: string) => void;
   onClearLinks: () => void;
-  /** Transcribe files on disk: they are asked about before they queue. */
-  onTranscribe: (paths: string[]) => void;
+  /** Files chosen here wait as pills, like links, until Start. */
+  onAddFiles: (paths: string[]) => void;
   dragging: boolean;
   blocked: string | null;
 };
@@ -38,7 +38,7 @@ export function ConvertView({
   onAddLinks,
   onRemoveLink,
   onClearLinks,
-  onTranscribe,
+  onAddFiles,
   dragging,
   blocked,
 }: Props) {
@@ -61,7 +61,7 @@ export function ConvertView({
       filters: [{ name: "Audio or video", extensions: FILE_EXTENSIONS }],
     });
     const paths = Array.isArray(picked) ? picked : picked ? [picked] : [];
-    onTranscribe(paths);
+    onAddFiles(paths);
   }
 
   async function chooseFolder() {
@@ -71,7 +71,9 @@ export function ConvertView({
 
   function start() {
     if (links.length === 0) return;
-    const items = links.map((l) => urlItem(l.url, l.title ?? l.url, l.title !== null));
+    const items = links.map((l) =>
+      l.file ? fileItem(l.url) : urlItem(l.url, l.title ?? l.url, l.title !== null),
+    );
     onClearLinks();
     void jobs.enqueue(items);
   }
@@ -88,7 +90,7 @@ export function ConvertView({
   } else if (jobs.stage === "done") {
     footer = failed === 0 ? `${done} finished` : `${done} finished, ${failed} failed`;
   } else if (links.length > 0) {
-    footer = `${links.length} ${links.length === 1 ? "link" : "links"} ready`;
+    footer = `${links.length} ready`;
   } else {
     footer = "Paste a link or drop a file";
   }
@@ -190,6 +192,19 @@ export function ConvertView({
               onToggle={() => update({ readScreen: !settings.readScreen })}
               label="Read the screen"
               hint="slower"
+            />
+          </div>
+          <div className="opts__language">
+            <Segmented<string>
+              label="Language spoken"
+              value={settings.transcriptLangs[0] === "en" ? "en" : "sr"}
+              onChange={(lang) =>
+                update({ transcriptLangs: lang === "sr" ? ["sr", "en"] : ["en", "sr"] })
+              }
+              options={[
+                { value: "sr", label: "Serbian" },
+                { value: "en", label: "English" },
+              ]}
             />
           </div>
         </div>
