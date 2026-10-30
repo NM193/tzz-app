@@ -122,7 +122,9 @@ These were bugs. The comments in the code say the same; this is the index.
   supplies every title: reading them one by one is how you earn an HTTP 429.
 - **`--no-part` plus an existing file is a trap.** yt-dlp treats a finished
   download as an interrupted one and fails resuming past its end (HTTP 416).
-  Check for the file first.
+  The video checks for the file first. The audio passes `--no-continue`,
+  because a run that failed at the conversion leaves its finished download
+  behind; a finished MP3 is still recognised and kept.
 - **yt-dlp looks for ffmpeg only on PATH.** Resolving ffmpeg ourselves is not
   enough: opened from Finder, yt-dlp saw no ffmpeg at all -- not Homebrew's,
   not the one beside it inside the app -- and every download failed at the MP3

@@ -12,6 +12,7 @@ it, not about the code.
 
 ### Fixed
 - A YouTube link is downloaded again instead of failing with "ffmpeg not found", which happened whenever the app was opened from Finder or the Dock.
+- A link that failed partway can be run again, instead of failing with "Requested range not satisfiable".
 
 ## 0.3.3 — 2026-10-24
 

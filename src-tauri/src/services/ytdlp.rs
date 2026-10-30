@@ -245,6 +245,11 @@ pub async fn download_audio(
         "--no-playlist".into(),
         "--newline".into(),
         "--no-part".into(),
+        // A run that failed at the conversion leaves its finished download
+        // here, and with --no-part yt-dlp takes it for an interrupted one and
+        // fails resuming past its end (HTTP 416). This starts it over instead.
+        // A finished MP3 is still recognised and kept.
+        "--no-continue".into(),
         // Structured progress we can parse reliably.
         "--progress-template".into(),
         format!("download:{PROGRESS_TAG} download %(progress._percent_str)s %(progress._eta_str)s"),
