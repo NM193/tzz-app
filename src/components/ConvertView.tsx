@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { errorMessage, openOutputFolder, revealInFileManager } from "../lib/api";
-import { fileItem, urlItem, type Pasted, type PendingLink } from "../lib/queue";
+import { fileItem, urlItem, type Pasted, type PendingLink, type QueueItem } from "../lib/queue";
 import { libraryLabel, type Settings } from "../lib/settings";
 import { STAGE_LABEL, type Jobs } from "../lib/useJobs";
 import { Check, Segmented } from "./Controls";
@@ -22,6 +22,10 @@ type Props = {
   onClearLinks: () => void;
   /** Files chosen here wait as pills, like links, until Start. */
   onAddFiles: (paths: string[]) => void;
+  /** Start: the batch goes to the library check, with the pills it came from. */
+  onStart: (items: QueueItem[], pills: string[]) => void;
+  /** A batch from here is being checked or asked about; Start waits. */
+  starting: boolean;
   dragging: boolean;
   blocked: string | null;
 };
@@ -39,6 +43,8 @@ export function ConvertView({
   onRemoveLink,
   onClearLinks,
   onAddFiles,
+  onStart,
+  starting,
   dragging,
   blocked,
 }: Props) {
@@ -72,10 +78,13 @@ export function ConvertView({
   function start() {
     if (links.length === 0) return;
     const items = links.map((l) =>
-      l.file ? fileItem(l.url) : urlItem(l.url, l.title ?? l.url, l.title !== null),
+      l.file
+        ? fileItem(l.url)
+        : { ...urlItem(l.url, l.title ?? l.url, l.title !== null), videoId: l.videoId },
     );
-    onClearLinks();
-    void jobs.enqueue(items);
+    // The pills stay until the jobs are admitted: Cancel in the names
+    // dialog leaves them where they were.
+    onStart(items, links.map((l) => l.id));
   }
 
   const done = jobs.queue.filter((q) => q.status === "done").length;
@@ -286,7 +295,7 @@ export function ConvertView({
             <button
               type="button"
               className="cta"
-              disabled={links.length === 0 || nothingKept || !!blocked}
+              disabled={links.length === 0 || nothingKept || !!blocked || starting}
               title={nothingKept ? "Choose something to keep first" : undefined}
               onClick={start}
             >

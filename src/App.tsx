@@ -4,7 +4,9 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import {
   checkDependencies,
   defaultWhisperModel,
+  libraryClashes,
   setGlass,
+  type Clash,
   type DependencyStatus,
 } from "./lib/api";
 import {
@@ -15,6 +17,7 @@ import {
   pendingLink,
   type Pasted,
   type PendingLink,
+  type QueueItem,
 } from "./lib/queue";
 import { errorMessage, probePlaylist, probeVideo } from "./lib/api";
 import { loadSettings, saveSettings, type Settings } from "./lib/settings";
@@ -22,6 +25,8 @@ import { STAGE_LABEL, useJobs } from "./lib/useJobs";
 import { clock, useRecorder } from "./lib/useRecorder";
 import { ConvertView } from "./components/ConvertView";
 import { LanguagePrompt } from "./components/LanguagePrompt";
+import { NamePrompt } from "./components/NamePrompt";
+import { toCandidates } from "./lib/naming";
 import { LibraryView } from "./components/LibraryView";
 import { RecordView } from "./components/RecordView";
 import { SettingsView } from "./components/SettingsView";
@@ -35,6 +40,9 @@ import type { LibraryEntry, TranscriptDocument } from "./lib/api";
 import { useLibrary } from "./lib/useLibrary";
 import { scan } from "./lib/find";
 import { readNotes, saveNote } from "./lib/api";
+
+/** Jobs on their way into the queue, and the Convert pills they came from. */
+type Batch = { items: QueueItem[]; pills: string[] };
 
 export default function App() {
   const [view, setView] = useState<View>("convert");
@@ -82,6 +90,56 @@ export default function App() {
   }
 
   const jobs = useJobs(settings);
+
+  // One way into the queue: checked against the library first, and asked
+  // about if anything clashes. One batch at a time -- a recording that stops
+  // while the dialog is open waits for it to close.
+  const [naming, setNaming] = useState<{ batch: Batch; clashes: Clash[] } | null>(null);
+  /** Pills on their way in; Start waits rather than sending them twice. */
+  const [starting, setStarting] = useState(false);
+  const admitting = useRef<Batch[]>([]);
+  const admittingBusy = useRef(false);
+  const outDir = useRef(settings.outDir);
+  outDir.current = settings.outDir;
+
+  function admit(batch: Batch) {
+    if (batch.items.length === 0) return;
+    if (batch.pills.length > 0) setStarting(true);
+    admitting.current.push(batch);
+    void admitNext();
+  }
+
+  async function admitNext() {
+    if (admittingBusy.current) return;
+    const batch = admitting.current.shift();
+    if (!batch) return;
+    admittingBusy.current = true;
+
+    let clashes: Clash[] = [];
+    try {
+      clashes = await libraryClashes(outDir.current || null, toCandidates(batch.items));
+    } catch {
+      // A check that cannot run must not stop the work: it runs as it did.
+    }
+    if (clashes.some((clash) => clash.inLibrary || clash.sameAs !== null)) {
+      setNaming({ batch, clashes });
+      return;
+    }
+    settle(batch, batch.items);
+  }
+
+  /** The batch is through, as `items`, or cancelled when that is null. */
+  function settle(batch: Batch, items: QueueItem[] | null) {
+    if (items !== null) {
+      const pills = new Set(batch.pills);
+      setLinks((prev) => prev.filter((l) => !pills.has(l.id)));
+      if (items.length > 0) void jobs.enqueue(items);
+    }
+    if (batch.pills.length > 0) setStarting(false);
+    setNaming(null);
+    admittingBusy.current = false;
+    void admitNext();
+  }
   // The results list, shared: the hook measures it for the column re-flow.
   const resultsRef = useRef<HTMLOListElement>(null);
   const library = useLibrary(settings, libraryVersion, resultsRef);
@@ -251,7 +309,9 @@ export default function App() {
   async function readTitle(link: PendingLink) {
     try {
       const meta = await probeVideo(link.url);
-      setLinks((all) => all.map((l) => (l.id === link.id ? { ...l, title: meta.title } : l)));
+      setLinks((all) =>
+        all.map((l) => (l.id === link.id ? { ...l, title: meta.title, videoId: meta.id } : l)),
+      );
     } catch {
       setLinks((all) => all.map((l) => (l.id === link.id ? { ...l, failed: true } : l)));
     }
@@ -271,7 +331,7 @@ export default function App() {
         const known = new Set(all.filter((l) => l.id !== link.id).map((l) => l.url));
         const added = playlist.items
           .filter((item) => !known.has(item.url))
-          .map((item) => knownLink(item.url, item.title));
+          .map((item) => ({ ...knownLink(item.url, item.title), videoId: item.id }));
         const at = all.findIndex((l) => l.id === link.id);
         if (at === -1) return all;
         return [...all.slice(0, at), ...added, ...all.slice(at + 1)];
@@ -362,6 +422,8 @@ export default function App() {
             onRemoveLink={(id) => setLinks((prev) => prev.filter((l) => l.id !== id))}
             onClearLinks={() => setLinks([])}
             onAddFiles={addFiles}
+            onStart={(items, pills) => admit({ items, pills })}
+            starting={starting}
             dragging={dragging}
             blocked={blocked}
           />
@@ -415,7 +477,7 @@ export default function App() {
         )}
       </main>
 
-      {asking.length > 0 && (
+      {asking.length > 0 && !naming && (
         <LanguagePrompt
           paths={asking}
           whisperModelPath={settings.whisperModelPath || null}
@@ -423,9 +485,22 @@ export default function App() {
           fallback={settings.transcriptLangs[0] === "en" ? "en" : "sr"}
           onConfirm={(files) => {
             setAsking([]);
-            void jobs.enqueue(files.map((file) => fileItem(file.path, file.language, true)));
+            admit({
+              items: files.map((file) => fileItem(file.path, file.language, true)),
+              pills: [],
+            });
           }}
           onCancel={() => setAsking([])}
+        />
+      )}
+
+      {naming && (
+        <NamePrompt
+          items={naming.batch.items}
+          clashes={naming.clashes}
+          outDir={settings.outDir || null}
+          onConfirm={(items) => settle(naming.batch, items)}
+          onCancel={() => settle(naming.batch, null)}
         />
       )}
     </div>

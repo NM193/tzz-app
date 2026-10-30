@@ -7,6 +7,7 @@ it, not about the code.
 ## Unreleased
 
 ### New
+- When something you start is already in the library, the app asks whether to give it a new name, replace it, or skip it.
 
 ### Improved
 
