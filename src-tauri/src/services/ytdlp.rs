@@ -231,12 +231,17 @@ pub async fn download_audio(
     opts: DownloadOptions<'_>,
 ) -> Result<DownloadOutput, String> {
     let ytdlp = binaries::require("yt-dlp")?;
-    binaries::require("ffmpeg")?; // yt-dlp needs it for the MP3 conversion
+    // yt-dlp needs it for the MP3 conversion, and looks for it only on PATH --
+    // which, for an app opened from Finder, holds neither Homebrew's copy nor
+    // the one inside the app. So it is told where ours is.
+    let ffmpeg = binaries::require("ffmpeg")?;
 
     std::fs::create_dir_all(opts.out_dir)
         .map_err(|e| format!("Could not create output folder: {e}"))?;
 
     let mut args: Vec<String> = vec![
+        "--ffmpeg-location".into(),
+        ffmpeg.to_string_lossy().into_owned(),
         "--no-playlist".into(),
         "--newline".into(),
         "--no-part".into(),

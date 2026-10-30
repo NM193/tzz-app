@@ -112,6 +112,11 @@ fn from_youtube(folder: &Path, poster: &Path) -> bool {
     let Ok(ytdlp) = binaries::require("yt-dlp") else {
         return false;
     };
+    // Converting the cover takes ffmpeg, which yt-dlp would look for only on
+    // PATH, where an app opened from Finder has none.
+    let Ok(ffmpeg) = binaries::require("ffmpeg") else {
+        return false;
+    };
 
     let work = std::env::temp_dir().join(format!("tzz-cover-{id}"));
     let _ = std::fs::remove_dir_all(&work);
@@ -120,6 +125,8 @@ fn from_youtube(folder: &Path, poster: &Path) -> bool {
     }
 
     let fetched = Command::new(ytdlp)
+        .arg("--ffmpeg-location")
+        .arg(&ffmpeg)
         .args(["--no-playlist", "--skip-download", "--write-thumbnail"])
         .args(["--convert-thumbnails", "jpg"])
         .arg("--output")

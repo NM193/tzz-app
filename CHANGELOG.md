@@ -11,6 +11,7 @@ it, not about the code.
 ### Improved
 
 ### Fixed
+- A YouTube link is downloaded again instead of failing with "ffmpeg not found", which happened whenever the app was opened from Finder or the Dock.
 
 ## 0.3.3 — 2026-10-24
 

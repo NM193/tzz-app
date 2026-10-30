@@ -123,6 +123,11 @@ These were bugs. The comments in the code say the same; this is the index.
 - **`--no-part` plus an existing file is a trap.** yt-dlp treats a finished
   download as an interrupted one and fails resuming past its end (HTTP 416).
   Check for the file first.
+- **yt-dlp looks for ffmpeg only on PATH.** Resolving ffmpeg ourselves is not
+  enough: opened from Finder, yt-dlp saw no ffmpeg at all -- not Homebrew's,
+  not the one beside it inside the app -- and every download failed at the MP3
+  conversion. A yt-dlp run that converts anything gets `--ffmpeg-location`.
+  `tauri dev` never shows this, because the terminal's PATH has Homebrew.
 - **Every folder can show a picture, one way or another.** `thumb.rs` tries the
   cover yt-dlp wrote, then a frame from 30 seconds in (not the first second --
   that is a title card), then the waveform of the audio, then the cover fetched
