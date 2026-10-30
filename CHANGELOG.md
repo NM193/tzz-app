@@ -7,9 +7,15 @@ it, not about the code.
 ## Unreleased
 
 ### New
-- When something you start is already in the library, the app asks whether to give it a new name, replace it, or skip it.
 
 ### Improved
+
+### Fixed
+
+## 0.4.0 — 2026-10-30
+
+### New
+- When something you start is already in the library, the app asks whether to give it a new name, replace it, or skip it.
 
 ### Fixed
 - A YouTube link is downloaded again instead of failing with "ffmpeg not found", which happened whenever the app was opened from Finder or the Dock.
