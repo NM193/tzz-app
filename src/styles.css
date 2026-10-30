@@ -1637,6 +1637,11 @@ mark {
   color: var(--bg);
 }
 
+.segmented button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .switch {
   position: relative;
   width: 2.5rem;
@@ -2439,4 +2444,37 @@ mark {
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 1.25rem;
+}
+
+/*
+  The names dialog. A row that has chosen New name grows its field beneath
+  it: the link field, one size down.
+*/
+.prompt__row--naming {
+  grid-template-areas:
+    "name choice"
+    "state choice"
+    "field field";
+}
+
+.prompt__field {
+  grid-area: field;
+  min-height: 2.25rem;
+  margin-top: 0.375rem;
+  padding: 0 0.75rem;
+}
+
+.prompt__field input {
+  height: 2.25rem;
+  min-width: 0;
+  font-size: 0.875rem;
+}
+
+/* A name that cannot be used: its field and its line in the accent. */
+.prompt__field[data-refused] {
+  border-color: var(--accent);
+}
+
+.prompt__state[data-refused] {
+  color: var(--accent);
 }

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 type SegmentedProps<T extends string> = {
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; disabled?: boolean }[];
   value: T;
   onChange: (value: T) => void;
   label: string;
@@ -17,6 +17,7 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
           type="button"
           role="radio"
           aria-checked={value === option.value}
+          disabled={option.disabled}
           onClick={() => onChange(option.value)}
         >
           {option.label}
