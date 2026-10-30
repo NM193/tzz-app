@@ -5,9 +5,10 @@
 //! or a transcript -- not merely that it exists: a failed run leaves a folder
 //! of leftovers, and running it again must not be asked about.
 
+use std::collections::HashSet;
 use std::path::Path;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::combine;
 use super::library;
@@ -144,6 +145,131 @@ pub fn clear_for_replace(root: &Path, folder: &Path) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// One job about to join the queue, as the check before Start sees it.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Candidate {
+    /// The frontend's id for the job, handed back unchanged.
+    pub key: String,
+    /// A file on disk. Its stem names the folder unless `name` says otherwise.
+    pub path: Option<String>,
+    /// A link's title.
+    pub title: Option<String>,
+    /// A link's video id. A link without one is not checked.
+    pub video_id: Option<String>,
+    /// The name in the dialog's field, which wins over the others.
+    pub name: Option<String>,
+}
+
+/// What the check found for one job. Mirrors `Clash` in `src/lib/api.ts`.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Clash {
+    pub key: String,
+    /// The folder the job would write into; empty when it was not checked.
+    pub folder: String,
+    /// The library already has that folder, holding a result.
+    pub in_library: bool,
+    /// The key of an earlier job in this batch that writes into it too.
+    pub same_as: Option<String>,
+    /// Replace is on offer: the library has the folder, no earlier job
+    /// writes into it, and no other job reads its file from there.
+    pub replaceable: bool,
+    /// The first free `<name> (n)`, when the folder is taken.
+    pub suggestion: Option<String>,
+    /// The name can be a folder at all.
+    pub usable: bool,
+    pub holds: Holds,
+}
+
+// The tests' shorthand. The app asks the same question in `naming.ts`.
+#[cfg(test)]
+impl Clash {
+    fn is_taken(&self) -> bool {
+        self.in_library || self.same_as.is_some()
+    }
+}
+
+/// The name a job's folder is made from, and the id it carries.
+fn naming(item: &Candidate) -> Option<(String, Option<&str>)> {
+    if let Some(path) = item.path.as_deref() {
+        let name = item.name.clone().unwrap_or_else(|| file_title(Path::new(path)));
+        return Some((name, None));
+    }
+    let id = item.video_id.as_deref()?;
+    let name = item.name.clone().or_else(|| item.title.clone())?;
+    Some((name, Some(id)))
+}
+
+/// Every job of a batch against the library and against each other, in
+/// order, one answer each.
+///
+/// Names compare case-folded, as APFS compares them. Suggestions stay clear
+/// of every folder the batch uses, above or below, and of each other.
+pub fn clashes(root: &Path, items: &[Candidate]) -> Vec<Clash> {
+    let named: Vec<Option<(String, Option<&str>)>> = items.iter().map(naming).collect();
+    let folders: Vec<Option<String>> = named
+        .iter()
+        .map(|n| n.as_ref().map(|(name, id)| folder_name(name, *id)))
+        .collect();
+    let mut used: HashSet<String> = folders.iter().flatten().map(|f| f.to_lowercase()).collect();
+
+    items
+        .iter()
+        .enumerate()
+        .map(|(at, item)| {
+            let (Some((name, id)), Some(folder)) = (&named[at], &folders[at]) else {
+                return Clash {
+                    key: item.key.clone(),
+                    folder: String::new(),
+                    in_library: false,
+                    same_as: None,
+                    replaceable: false,
+                    suggestion: None,
+                    usable: true,
+                    holds: Holds::default(),
+                };
+            };
+            let dir = root.join(folder);
+            let reads_from = |candidate: &Candidate| {
+                candidate.path.as_deref().is_some_and(|p| source_inside(Path::new(p), &dir))
+            };
+
+            let lower = folder.to_lowercase();
+            let same_as = (0..at)
+                .find(|&k| folders[k].as_ref().is_some_and(|f| f.to_lowercase() == lower))
+                .map(|k| items[k].key.clone());
+            let found = holds(&dir);
+            let in_library = !reads_from(item) && found.has_result();
+            let read_by_another =
+                items.iter().enumerate().any(|(k, other)| k != at && reads_from(other));
+
+            let suggestion = (in_library || same_as.is_some()).then(|| {
+                let free = (2..)
+                    .map(|n| suggest(name, *id, n))
+                    .find(|s| {
+                        let f = folder_name(s, *id);
+                        !used.contains(&f.to_lowercase()) && !root.join(&f).exists()
+                    })
+                    .expect("one of endlessly many numbers is free");
+                used.insert(folder_name(&free, *id).to_lowercase());
+                free
+            });
+
+            Clash {
+                key: item.key.clone(),
+                folder: folder.clone(),
+                in_library,
+                replaceable: in_library && same_as.is_none() && !read_by_another,
+                same_as,
+                suggestion,
+                usable: usable(name),
+                holds: found,
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -298,5 +424,141 @@ mod tests {
         assert!(clear_for_replace(&root, &root).is_err());
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&elsewhere);
+    }
+
+    fn link(key: &str, title: &str, id: &str) -> Candidate {
+        Candidate {
+            key: key.into(),
+            path: None,
+            title: Some(title.into()),
+            video_id: Some(id.into()),
+            name: None,
+        }
+    }
+
+    fn file(key: &str, path: &Path) -> Candidate {
+        Candidate {
+            key: key.into(),
+            path: Some(path.to_string_lossy().into_owned()),
+            title: None,
+            video_id: None,
+            name: None,
+        }
+    }
+
+    #[test]
+    fn a_finished_link_is_in_the_library() {
+        let root = temp_root("link");
+        folder_with(&root, "Talk [abc]", &["Talk [abc].mp3", "Talk [abc].notes.md"]);
+        let found = clashes(&root, &[link("1", "Talk", "abc"), link("2", "Other", "def")]);
+        assert!(found[0].in_library && found[0].replaceable);
+        assert_eq!(found[0].folder, "Talk [abc]");
+        assert_eq!(found[0].suggestion.as_deref(), Some("Talk (2)"));
+        assert!(found[0].holds.audio && found[0].holds.notes);
+        assert!(!found[1].is_taken());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_failed_run_is_not_asked_about() {
+        let root = temp_root("failed");
+        folder_with(&root, "Talk [abc]", &["Talk [abc].webm", "poster.jpg"]);
+        assert!(!clashes(&root, &[link("1", "Talk", "abc")])[0].is_taken());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_link_without_an_id_is_not_checked() {
+        let root = temp_root("noid");
+        folder_with(&root, "Talk [abc]", &["Talk [abc].mp3"]);
+        let mut item = link("1", "Talk", "abc");
+        item.video_id = None;
+        let found = clashes(&root, &[item]);
+        assert!(!found[0].is_taken());
+        assert!(found[0].folder.is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn two_files_of_one_name_clash_whatever_the_case() {
+        let root = temp_root("batch");
+        let found = clashes(
+            &root,
+            &[file("a", Path::new("/w1/Lecture 1.mp4")), file("b", Path::new("/w2/lecture 1.mp4"))],
+        );
+        // The library has neither: the first is free, the second is not.
+        assert!(!found[0].is_taken());
+        assert_eq!(found[1].same_as.as_deref(), Some("a"));
+        assert!(!found[1].replaceable);
+        assert_eq!(found[1].suggestion.as_deref(), Some("lecture 1 (2)"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn suggestions_skip_every_name_the_batch_uses() {
+        let root = temp_root("suggest");
+        folder_with(&root, "Lecture 1", &["Lecture 1.mp3"]);
+        let found = clashes(
+            &root,
+            &[
+                file("a", Path::new("/w1/Lecture 1.mp4")),
+                file("b", Path::new("/w2/Lecture 1.mp4")),
+                file("c", Path::new("/w3/Lecture 1 (2).mp4")),
+            ],
+        );
+        // (2) belongs to c, further down; a takes (3) and b the next free.
+        assert_eq!(found[0].suggestion.as_deref(), Some("Lecture 1 (3)"));
+        assert_eq!(found[1].suggestion.as_deref(), Some("Lecture 1 (4)"));
+        assert!(!found[2].is_taken());
+        // Only the first of a folder's jobs may replace it.
+        assert!(found[0].replaceable && !found[1].replaceable);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_file_dropped_from_its_own_folder_is_not_taken() {
+        let root = temp_root("own");
+        let folder = folder_with(&root, "Lecture 1", &["Lecture 1.mp3", "Lecture 1.md"]);
+        assert!(!clashes(&root, &[file("a", &folder.join("Lecture 1.mp3"))])[0].is_taken());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn replace_is_not_offered_when_another_job_reads_from_the_folder() {
+        let root = temp_root("reads");
+        let folder = folder_with(&root, "Talk [abc]", &["Talk [abc].mp3", "Talk [abc].mp4"]);
+        let found = clashes(
+            &root,
+            &[link("link", "Talk", "abc"), file("kept", &folder.join("Talk [abc].mp4"))],
+        );
+        assert!(found[0].in_library);
+        assert!(!found[0].replaceable, "Replace would delete the video the next job reads");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_name_from_the_dialog_wins_and_is_judged() {
+        let root = temp_root("chosen");
+        folder_with(&root, "Talk [abc]", &["Talk [abc].mp3"]);
+        let mut renamed = link("1", "Talk", "abc");
+        renamed.name = Some("Talk (2)".into());
+        let found = clashes(&root, &[renamed]);
+        assert_eq!(found[0].folder, "Talk (2) [abc]");
+        assert!(!found[0].is_taken());
+
+        let mut hidden = link("2", "Talk", "abc");
+        hidden.name = Some(".secret".into());
+        assert!(!clashes(&root, &[hidden])[0].usable);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_clash_names_the_job_it_clashes_with_even_below() {
+        let root = temp_root("below");
+        let mut renamed = file("row", Path::new("/w1/Lecture 1.mp4"));
+        renamed.name = Some("Lecture 2".into());
+        let found = clashes(&root, &[renamed, file("other", Path::new("/w2/Lecture 2.mp4"))]);
+        assert_eq!(found[1].same_as.as_deref(), Some("row"));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
