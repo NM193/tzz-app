@@ -9,6 +9,7 @@ pub mod language;
 pub mod library;
 pub mod model;
 pub mod mp3;
+pub mod names;
 pub mod notes;
 pub mod pdf;
 pub mod recorder;
