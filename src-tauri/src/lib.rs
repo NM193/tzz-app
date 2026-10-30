@@ -38,6 +38,7 @@ pub fn run() {
             commands::media::reveal_in_file_manager,
             commands::media::open_output_folder,
             commands::library::list_library,
+            commands::library::library_clashes,
             commands::library::ensure_thumbnail,
             commands::library::open_document,
             commands::library::read_notes,

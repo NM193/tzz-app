@@ -13,6 +13,7 @@ use crate::services::language::{self, Detected};
 use crate::services::pdf;
 use crate::services::model::{self, Model};
 use crate::services::mp3;
+use crate::services::names;
 use crate::services::screen;
 use crate::services::thumb;
 use crate::services::transcript::{self, Screen, Transcript, TranscriptHeader};
@@ -54,6 +55,9 @@ pub struct JobRequest {
     /// A name to use instead of the one the site reports. Some players carry
     /// no title worth having -- a Wistia lesson comes back as "cuku29nr8.mp4".
     pub title: Option<String>,
+    /// The library had this folder and the owner chose to replace it:
+    /// everything in it but the notes goes before the job starts.
+    pub replace: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +80,11 @@ pub struct LocalFileRequest {
     pub want_transcript: Option<bool>,
     /// "v0" | "320", as for a download.
     pub audio_quality: Option<String>,
+    /// A name chosen in place of the file's own, because the library had
+    /// that one. Names the folder, the files and the transcript.
+    pub name: Option<String>,
+    /// As for a download: clear the folder, all but the notes, first.
+    pub replace: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -212,6 +221,11 @@ async fn run_job_inner(app: &AppHandle, request: JobRequest) -> Result<JobResult
         .to_string();
 
     let job_dir = job_folder(&out_dir, &title, &meta.id)?;
+    // Cleared here, when the queue reaches this job, not when Replace was
+    // chosen: a queue stopped before now leaves the old results alone.
+    if request.replace.unwrap_or(false) {
+        names::clear_for_replace(&out_dir, &job_dir)?;
+    }
 
     // The audio call is also what fetches the captions, and Whisper needs the
     // file, so a transcript pulls the audio in even when the MP3 is unwanted.
@@ -413,15 +427,21 @@ async fn transcribe_file_inner(app: &AppHandle, request: LocalFileRequest) -> Re
         None
     };
 
-    let title = path
-        .file_stem()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "Audio".to_string());
+    // A name chosen in the dialog, because the library had the file's own.
+    let chosen = request.name.as_deref().map(str::trim).filter(|n| !n.is_empty());
+    if chosen.is_some_and(|name| !names::usable(name)) {
+        return Err("That name cannot be a folder in the library.".to_string());
+    }
+    let title = chosen.map(str::to_string).unwrap_or_else(|| names::file_title(&path));
 
     // The original stays exactly where it is, untouched. Everything this job
     // makes goes into a folder of its own in the library, as a download's does.
-    let job_dir = library_folder(&out_dir, &combine::sanitise(&title))?;
+    let job_dir = library_folder(&out_dir, &names::folder_name(&title, None))?;
     let _hollow = RemoveIfEmpty(&job_dir);
+    // Never the folder the file itself is in: Replace would delete it unread.
+    if request.replace.unwrap_or(false) && !names::source_inside(&path, &job_dir) {
+        names::clear_for_replace(&out_dir, &job_dir)?;
+    }
     // The files take the folder's name, shortened as it may have been.
     let name = job_dir
         .file_name()
@@ -788,7 +808,7 @@ pub(crate) fn resolve_out_dir(requested: Option<&str>) -> Result<PathBuf, String
 /// formats. Ten of them loose in a folder is forty files; in their own folders
 /// it is ten lectures, and the video is somewhere you can find it again.
 fn job_folder(out_dir: &std::path::Path, title: &str, video_id: &str) -> Result<PathBuf, String> {
-    library_folder(out_dir, &format!("{} [{video_id}]", combine::sanitise(title)))
+    library_folder(out_dir, &names::folder_name(title, Some(video_id)))
 }
 
 /// Removes a folder when dropped, if nothing was written into it: a job that
@@ -804,11 +824,9 @@ impl Drop for RemoveIfEmpty<'_> {
 }
 
 /// A folder of its own in the library, for a download or a file on disk.
+/// `names::folder_name` has already cut the name to fit.
 fn library_folder(out_dir: &std::path::Path, name: &str) -> Result<PathBuf, String> {
-    // 120 bytes keeps the whole path clear of the 255-byte filename limit.
-    let trimmed: String = name.chars().take(120).collect();
-
-    let folder = out_dir.join(trimmed.trim());
+    let folder = out_dir.join(name);
     // Claimed before it is made, so a stop knows whether it was ours to remove.
     cancel::claim(&folder);
     std::fs::create_dir_all(&folder)

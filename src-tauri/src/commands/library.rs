@@ -1,5 +1,6 @@
 use crate::services::document::{self, Document};
 use crate::services::library::{self, LibraryEntry};
+use crate::services::names::{self, Candidate, Clash};
 use crate::services::notes;
 use crate::services::thumb;
 
@@ -10,6 +11,14 @@ use super::media::resolve_out_dir;
 pub fn list_library(out_dir: Option<String>) -> Result<Vec<LibraryEntry>, String> {
     let root = resolve_out_dir(out_dir.as_deref())?;
     Ok(library::list(&root))
+}
+
+/// Which of the jobs about to start would land in a folder the library
+/// already has, or in one another of them uses. One answer per job, in order.
+#[tauri::command]
+pub fn library_clashes(out_dir: Option<String>, items: Vec<Candidate>) -> Result<Vec<Clash>, String> {
+    let root = resolve_out_dir(out_dir.as_deref())?;
+    Ok(names::clashes(&root, &items))
 }
 
 /// The folder's picture, made now if it has none.
