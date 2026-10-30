@@ -1,6 +1,6 @@
 # A name the library already has
 
-**Status:** designed 2026-10-30, not built.
+**Status:** built 2026-10-30.
 **Prototype:** `.superpowers/prototype/tzz-name-taken.html`
 
 ## What was found

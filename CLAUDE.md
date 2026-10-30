@@ -37,7 +37,8 @@ macOS ties permissions and settings to it.
     job and deleting what it wrote · `library` reading the output folder ·
     `thumb` one picture per folder · `glass` the frosted window ·
     `model` fetching a Whisper model · `language` hearing which language a
-    file is in · `mp3` an MP3 of a file on disk
+    file is in · `mp3` an MP3 of a file on disk · `names` what a job's
+    folder is called, and whether the library already has it
 - `src-tauri/helpers/ocr.swift` the Vision text reader.
 
 ## Key patterns
@@ -268,7 +269,8 @@ job mid-run, a Library that searches and filters what is on disk, a picture per
 folder, a notification when a run ends, reading a transcript inside the app,
 unpacking a playlist link into the videos it holds, asking which language a
 file is spoken in before transcribing it, finding a word in an open
-document, copying a chapter out and keeping what you bring back as a note.
+document, copying a chapter out and keeping what you bring back as a note,
+and asking what to do when a job's name is already in the library.
 
 Not built: Windows support.
 
@@ -278,6 +280,7 @@ Not built: Windows support.
 - `npm run install:app` -- build and replace the copy in /Applications
 - `npm run build:vite` -- typecheck the frontend only
 - `bash scripts/fetch-tools.sh` -- put the external tools inside the app
-- `cd src-tauri && cargo test` -- 105 tests, all pure logic
+- `cd src-tauri && cargo test` -- 142 tests, all pure logic
 - `python3 scripts/test_changelog.py` -- the release notes reader
 - `node --test src/lib/releaseNotes.test.ts` -- what the update notice shows
+- `node --test src/lib/naming.test.ts` -- what the names dialog asks and refuses
