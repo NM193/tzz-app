@@ -51,6 +51,10 @@ export function ConvertView({
   const wantMd = settings.transcriptFormat !== "pdf";
   const wantPdf = settings.transcriptFormat !== "md";
   const nothingKept = !settings.wantAudio && !settings.keepVideo && !settings.wantTranscript;
+  // A link is checked against the library by its video id, which arrives
+  // with its title. Convert waits the second or two that takes rather than
+  // send a link through unchecked.
+  const reading = links.some((l) => !l.file && l.title === null && !l.failed);
 
   // Markdown and PDF are two ticks; the stored format is what they add up to.
   // The last one cannot come off: a transcript with no file is not one.
@@ -295,11 +299,15 @@ export function ConvertView({
             <button
               type="button"
               className="cta"
-              disabled={links.length === 0 || nothingKept || !!blocked || starting}
+              disabled={links.length === 0 || nothingKept || !!blocked || starting || reading}
               title={nothingKept ? "Choose something to keep first" : undefined}
               onClick={start}
             >
-              {links.length > 1 ? `Convert ${links.length} lectures` : "Convert"}
+              {reading
+                ? "Reading titles…"
+                : links.length > 1
+                  ? `Convert ${links.length} lectures`
+                  : "Convert"}
             </button>
           )}
         </span>

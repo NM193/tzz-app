@@ -116,8 +116,11 @@ cover through it. The MP3 inside keeps yt-dlp's name.
 
 **Which jobs are checked.** Local files and recordings always. A link only
 when its video id is known, which it is once its title has been read or it
-came out of a playlist. A link whose title is still being read, whose read
-failed, or whose name was given in the paste runs as it does today.
+came out of a playlist. A link whose read failed, or whose name was given in
+the paste, runs as it does today. While any link is still having its title
+read, Convert waits and says `Reading titles…`: checking the built app on
+2026-10-30, Convert pressed a second after pasting sent the link through
+unchecked, and it wrote over the transcript it already had.
 
 **One check at a time.** Start is disabled while a check is running, so it
 cannot send a batch twice. A batch that arrives while the dialog is open,
