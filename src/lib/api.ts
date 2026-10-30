@@ -65,6 +65,8 @@ export type JobRequest = {
   keepVideo: boolean;
   /** A name to use instead of the one the site reports. */
   title: string | null;
+  /** Clear the folder, all but the notes, before the job starts. */
+  replace: boolean;
 };
 
 export type LocalFileRequest = {
@@ -79,6 +81,10 @@ export type LocalFileRequest = {
   wantAudio: boolean;
   wantTranscript: boolean;
   audioQuality: AudioQuality;
+  /** A name in place of the file's own, for its folder, files and title. */
+  name: string | null;
+  /** Clear the folder, all but the notes, before the job starts. */
+  replace: boolean;
 };
 
 /** What Whisper heard in a file. Mirrors `Detected` in services/language.rs. */
@@ -294,6 +300,49 @@ export function setGlass(glass: boolean): Promise<void> {
 /** Every folder in the library, newest first. */
 export function listLibrary(outDir: string | null): Promise<LibraryEntry[]> {
   return invoke("list_library", { outDir });
+}
+
+/** A job about to join the queue. Mirrors `Candidate` in services/names.rs. */
+export type Candidate = {
+  /** The queue item's id, handed back unchanged. */
+  key: string;
+  /** A file on disk; its stem names the folder unless `name` is given. */
+  path?: string | null;
+  /** A link's title. */
+  title?: string | null;
+  /** A link's video id. A link without one is not checked. */
+  videoId?: string | null;
+  /** The name in the dialog's field. */
+  name?: string | null;
+};
+
+/** What a library folder holds. Mirrors `Holds` in services/names.rs. */
+export type Holds = {
+  audio: boolean;
+  transcript: boolean;
+  video: boolean;
+  screens: boolean;
+  notes: boolean;
+  /** Seconds since the epoch. */
+  modified: number;
+};
+
+/** What the check found for one job. Mirrors `Clash` in services/names.rs. */
+export type Clash = {
+  key: string;
+  /** Empty when the job was not checked. */
+  folder: string;
+  inLibrary: boolean;
+  /** The key of an earlier job in the batch with the same folder. */
+  sameAs: string | null;
+  replaceable: boolean;
+  suggestion: string | null;
+  usable: boolean;
+  holds: Holds;
+};
+
+export function libraryClashes(outDir: string | null, items: Candidate[]): Promise<Clash[]> {
+  return invoke("library_clashes", { outDir, items });
 }
 
 /**

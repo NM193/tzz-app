@@ -76,6 +76,8 @@ export function useJobs(settings: Settings) {
         wantAudio: s.wantAudio,
         wantTranscript: item.wantTranscript ?? s.wantTranscript,
         audioQuality: s.audioQuality,
+        name: item.name ?? null,
+        replace: item.replace ?? false,
       });
     }
     return runJob({
@@ -90,6 +92,7 @@ export function useJobs(settings: Settings) {
       readScreen: s.readScreen,
       keepVideo: s.keepVideo,
       title: item.named ? item.label : null,
+      replace: item.replace ?? false,
     });
   }
 

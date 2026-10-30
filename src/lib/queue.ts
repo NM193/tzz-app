@@ -17,6 +17,12 @@ export type QueueItem = {
   language?: string | null;
   /** Set by Record, whose button says Transcribe; otherwise the options decide. */
   wantTranscript?: boolean;
+  /** A link's video id, when known, so the library can be checked for it. */
+  videoId?: string;
+  /** Clear the folder's old results first, all but the notes. */
+  replace?: boolean;
+  /** A file's new name, for its folder, files and title. A link's new name goes in `label`. */
+  name?: string;
   result?: JobResult;
   error?: string;
 };
@@ -84,6 +90,8 @@ export type PendingLink = {
   playlist?: boolean;
   /** A file on disk waiting among the links; `url` is its path. */
   file?: boolean;
+  /** The video id, once the title has been read or the playlist unpacked. */
+  videoId?: string;
 };
 
 export function pendingLink(url: string, title?: string): PendingLink {
