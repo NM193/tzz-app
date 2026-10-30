@@ -30,7 +30,7 @@ pub struct LibraryEntry {
 }
 
 const AUDIO: &[&str] = &["mp3", "m4a", "wav", "flac"];
-const VIDEO: &[&str] = &["mp4", "mkv", "webm", "mov"];
+pub(super) const VIDEO: &[&str] = &["mp4", "mkv", "webm", "mov"];
 
 pub fn list(root: &Path) -> Vec<LibraryEntry> {
     let Ok(dir) = std::fs::read_dir(root) else {
@@ -93,7 +93,7 @@ fn is_notes(path: &Path) -> bool {
         .is_some_and(|name| name.ends_with(".notes.md"))
 }
 
-fn modified_at(path: &Path) -> u64 {
+pub(super) fn modified_at(path: &Path) -> u64 {
     std::fs::metadata(path)
         .and_then(|m| m.modified())
         .ok()
