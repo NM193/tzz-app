@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tzz App — a name the library already has</title>
+<style>
+/*
+  What Start asks when a job would land in a folder the library already has.
+  Level 2: the app's own tokens and faces, the states clickable. Same sheet as
+  the language prompt (.prompt), one row per clash.
+*/
+@font-face{font-family:"Instrument Serif";font-weight:400;src:url("../../src/fonts/instrument-serif-latin-ext.woff2") format("woff2");unicode-range:U+0100-02BA,U+1E00-1E9F}
+@font-face{font-family:"Instrument Serif";font-weight:400;src:url("../../src/fonts/instrument-serif-latin.woff2") format("woff2")}
+:root{
+  --bg:#181616; --bg-deep:#0e0d0d; --card:#100e0e; --bone:#fffddc; --muted:#7a726c; --muted-2:#bdb5ac;
+  --caption:#8a827b; --line:#2a2626; --line-2:#3a3533; --accent:#f7ab29;
+  --ease:cubic-bezier(.2,.8,.2,1); --wipe:cubic-bezier(.7,0,.2,1);
+  --font-sans:-apple-system,"SF Pro Text","Helvetica Neue",sans-serif;
+  --font-serif:"Instrument Serif","Iowan Old Style",Georgia,serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--bone);font:400 16px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased;user-select:none}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+:focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+
+/* What is behind the sheet: Convert, with three pills waiting. */
+.behind{max-width:52rem;margin:0 auto;padding:3rem 2.5rem}
+.behind h1{margin:0 0 1.5rem;font:400 3rem/.95 var(--font-serif);letter-spacing:-.03em}
+.behind .pills{display:flex;flex-wrap:wrap;gap:.5rem;padding:.75rem;border:1px solid var(--line-2);border-radius:.5rem}
+.behind .pill{padding:.375rem .75rem;border:1px solid var(--line-2);border-radius:999px;font-size:.8125rem;color:var(--muted-2)}
+
+.prompt{position:fixed;inset:0;display:grid;place-items:center;padding:2rem;background:color-mix(in srgb,var(--bg-deep) 72%,transparent)}
+.prompt__sheet{width:min(40rem,100%);max-height:calc(100vh - 4rem);overflow-y:auto;padding:1.75rem 1.75rem 1.25rem;border:1px solid var(--line-2);border-radius:.5rem;background:var(--card);animation:rise .5s var(--wipe) both}
+.prompt__title{margin:0 0 1rem;font:400 1.75rem/1.1 var(--font-serif);color:var(--bone)}
+.prompt__rows{margin:0;padding:0;list-style:none}
+.prompt__row{position:relative;display:grid;grid-template-columns:1fr auto;grid-template-areas:"name choice" "state choice" "rename rename";align-items:center;gap:.375rem 1.5rem;padding:.875rem 0;animation:rise .45s var(--wipe) both}
+.prompt__row:nth-child(2){animation-delay:.06s}
+.prompt__row:nth-child(3){animation-delay:.12s}
+.prompt__row::after{content:"";position:absolute;right:0;bottom:0;left:0;height:1px;background:var(--line);transform-origin:left;animation:draw .6s var(--ease) both}
+.prompt__name{grid-area:name;font:500 .9375rem/1.3 var(--font-sans);color:var(--bone);overflow-wrap:anywhere}
+/* Only read, never clicked: mono, uppercase, dim. */
+.prompt__state{grid-area:state;font:500 .625rem/1.5 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--caption)}
+.prompt__state b{font-weight:500;color:var(--accent)}
+.prompt__choice{grid-area:choice}
+.prompt__actions{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.25rem}
+
+/* The new name, under its row. Same field as the link box, one size down. */
+.rename{grid-area:rename;display:none;margin-top:.375rem}
+.prompt__row[data-choice="rename"] .rename{display:block}
+.rename__field{display:flex;align-items:center;height:2.25rem;padding:0 .75rem;border:1px solid var(--line-2);border-radius:.5rem;background:#1d1a1a;transition:border-color .25s}
+.rename__field:focus-within{border-color:var(--accent)}
+.rename__field[data-taken]{border-color:var(--accent)}
+.rename__field input{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--bone);font:400 .875rem var(--font-sans);user-select:text}
+
+.segmented{display:inline-flex;padding:.1875rem;border:1px solid var(--line-2);border-radius:.5rem}
+.segmented button{padding:.375rem .75rem;border-radius:.375rem;color:var(--muted-2);font:500 .8125rem var(--font-sans);transition:background .25s,color .25s}
+.segmented button[aria-checked="true"]{background:var(--bone);color:var(--bg)}
+.segmented button:disabled{opacity:.35;cursor:default}
+
+.cta{display:inline-flex;align-items:center;padding:.4375rem .875rem;border:1px solid var(--bone);border-radius:.5rem;background:var(--bone);color:var(--bg);font:500 .8125rem var(--font-sans);transition:background .2s,color .2s}
+.cta:hover:not(:disabled){background:transparent;color:var(--bone)}
+.cta:disabled{opacity:.35;cursor:default}
+.ghost{display:inline-flex;align-items:center;padding:.4375rem .75rem;border:1px solid var(--line-2);border-radius:.5rem;color:var(--muted-2);font:500 .75rem var(--font-sans);transition:color .2s,border-color .2s}
+.ghost:hover{color:var(--bone);border-color:var(--muted)}
+
+.note{position:fixed;left:0;right:0;bottom:1rem;text-align:center;font:500 .625rem var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.note button{font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--muted-2);text-decoration:underline;text-underline-offset:3px}
+
+@keyframes rise{from{clip-path:inset(100% 0 0 0);transform:translateY(.5rem)}to{clip-path:inset(0);transform:none}}
+@keyframes draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="behind" aria-hidden="true">
+  <h1>Convert</h1>
+  <div class="pills">
+    <span class="pill">Updates: Lumos for Webflow, Astro, Chrome Extension, and More</span>
+    <span class="pill">Lecture 1.mp4</span>
+    <span class="pill">Lecture 1.mp4</span>
+    <span class="pill">Understanding Autofit Grid For Webflow</span>
+  </div>
+</div>
+
+<div class="prompt">
+  <div class="prompt__sheet" role="dialog" aria-modal="true" aria-labelledby="t">
+    <h2 id="t" class="prompt__title">Already in the library</h2>
+    <ul class="prompt__rows" id="rows"></ul>
+    <div class="prompt__actions">
+      <button type="button" class="ghost" id="cancel">Cancel</button>
+      <button type="button" class="cta" id="go">Start</button>
+    </div>
+  </div>
+</div>
+
+<p class="note">Prototype · the fourth link is new, so it is not asked about · <button id="again">Open again</button></p>
+
+<script>
+// What Replace says is built from what each folder holds.
+// Folders the library already holds, by name. A real check asks Rust.
+const LIBRARY = new Set([
+  "Updates: Lumos for Webflow, Astro, Chrome Extension, and More",
+  "Lecture 1",
+]);
+
+// One row per clash. The second Lecture 1 is a different file with the same
+// name, from another folder: it clashes with the row above, not the library,
+// so replacing is not offered -- it would overwrite what this run just made.
+const ROWS = [
+  { name: "Updates: Lumos for Webflow, Astro, Chrome Extension, and More", folder: "Updates: Lumos for Webflow, Astro, Chrome Extension, and More",
+    state: "Finished 24 Oct · MP3 · Transcript · Notes", replace: true,
+    goes: "MP3, transcript and screen text go · Notes stay" },
+  { name: "Lecture 1.mp4", folder: "Lecture 1",
+    state: "From ~/Downloads/Week 1 · MP3 · Transcript", replace: true,
+    goes: "MP3 and transcript go" },
+  { name: "Lecture 1.mp4", folder: "Lecture 1",
+    state: "From ~/Downloads/Week 2 · Same name as another in this start", replace: false },
+];
+
+const SKIP_SAYS = "Not run";
+
+const rowsEl = document.getElementById("rows");
+const go = document.getElementById("go");
+let rows;
+
+function suggest(folder, used) {
+  for (let n = 2; ; n++) {
+    const name = `${folder} (${n})`;
+    if (!LIBRARY.has(name) && !used.has(name)) return name;
+  }
+}
+
+function render() {
+  const used = new Set();
+  rows = ROWS.map((r) => {
+    const name = suggest(r.folder, used);
+    used.add(name);
+    return { ...r, choice: "rename", newName: name };
+  });
+
+  rowsEl.innerHTML = "";
+  rows.forEach((r, i) => {
+    const li = document.createElement("li");
+    li.className = "prompt__row";
+    li.dataset.choice = r.choice;
+    li.innerHTML = `
+      <span class="prompt__name">${r.name}</span>
+      <span class="prompt__state" data-state>${r.state}</span>
+      <span class="prompt__choice">
+        <span class="segmented" role="radiogroup" aria-label="What to do with ${r.name}">
+          <button type="button" role="radio" data-v="rename">New name</button>
+          <button type="button" role="radio" data-v="replace" ${r.replace ? "" : "disabled"}>Replace</button>
+          <button type="button" role="radio" data-v="skip">Skip</button>
+        </span>
+      </span>
+      <label class="rename">
+        <span class="rename__field">
+          <input type="text" value="${r.newName}" aria-label="New name for ${r.name}" />
+        </span>
+      </label>`;
+    li.querySelectorAll("[data-v]").forEach((b) =>
+      b.addEventListener("click", () => { r.choice = b.dataset.v; update(); }));
+    li.querySelector("input").addEventListener("input", (e) => { r.newName = e.target.value; update(); });
+    rowsEl.appendChild(li);
+  });
+  update();
+}
+
+function update() {
+  const used = new Set();
+  let blocked = false;
+  rows.forEach((r, i) => {
+    const li = rowsEl.children[i];
+    li.dataset.choice = r.choice;
+    li.querySelectorAll("[data-v]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.v === r.choice)));
+
+    const state = li.querySelector("[data-state]");
+    state.innerHTML = r.choice === "replace" ? r.goes : r.choice === "skip" ? SKIP_SAYS : r.state;
+
+    const field = li.querySelector(".rename__field");
+    if (r.choice === "rename") {
+      const name = r.newName.trim();
+      const taken = !name || LIBRARY.has(name) || used.has(name);
+      used.add(name);
+      field.toggleAttribute("data-taken", taken);
+      if (taken) { state.innerHTML = `<b>${name ? "That name is taken too" : "Needs a name"}</b>`; blocked = true; }
+    }
+  });
+  go.disabled = blocked;
+}
+
+document.getElementById("again").addEventListener("click", () => {
+  const sheet = document.querySelector(".prompt__sheet");
+  sheet.style.animation = "none"; sheet.offsetHeight; sheet.style.animation = "";
+  render();
+});
+document.getElementById("cancel").addEventListener("click", () => document.getElementById("again").click());
+go.addEventListener("click", () => {
+  if (!go.disabled) go.textContent = "Started";
+  setTimeout(() => (go.textContent = "Start"), 1200);
+});
+render();
+</script>
+</body>
+</html>
