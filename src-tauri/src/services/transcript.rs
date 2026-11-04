@@ -490,7 +490,7 @@ pub async fn whisper_srt(
         .arg(model_path)
         .arg("-f")
         .arg(&wav_path)
-        .args(["-l", language, "-osrt", "-pp"])
+        .args(whisper_options(language))
         .arg("-of")
         .arg(&out_base)
         .stdout(Stdio::null())
@@ -541,6 +541,20 @@ pub async fn whisper_srt(
     let _ = std::fs::remove_file(&srt_path);
 
     Ok(srt)
+}
+
+/// Everything a Whisper run is told apart from which files to use.
+///
+/// WHY `-mc 0`: left alone, Whisper hands each 30-second window the text of
+/// the last one. A pause makes it invent a sign-off, the next window reads
+/// that line and writes it again, and the loop carries on through the speech
+/// that follows. `parse_srt` folds the repeats into one cue, so all the
+/// document shows is a hole. Measured on Serbian speech on 2026-11-04: 30
+/// seconds of silence cost Base 99% of what came after it, two minutes cost
+/// Small all of it, and Turbo lost up to a quarter. With `-mc 0` every run
+/// kept at least 92%, about what each model keeps with no pause at all.
+fn whisper_options(language: &str) -> [&str; 6] {
+    ["-l", language, "-mc", "0", "-osrt", "-pp"]
 }
 
 /// whisper-cli appends ".srt" to the `-of` base. `with_extension` would
@@ -843,6 +857,12 @@ mod tests {
         ] {
             assert_eq!(parse_whisper_progress(line), None, "{line}");
         }
+    }
+
+    #[test]
+    fn whisper_starts_each_window_without_the_text_of_the_last() {
+        let options = whisper_options("sr");
+        assert!(options.windows(2).any(|pair| pair == ["-mc", "0"]));
     }
 
     #[test]
