@@ -11,6 +11,10 @@ it, not about the code.
 ### Improved
 
 ### Fixed
+
+## 0.4.1 — 2026-11-05
+
+### Fixed
 - A transcript no longer loses what was said after a pause. Whisper could get stuck repeating one line and skip everything until it recovered, sometimes half an hour of a lecture.
 
 ## 0.4.0 — 2026-10-30
