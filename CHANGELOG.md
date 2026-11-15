@@ -11,6 +11,10 @@ it, not about the code.
 ### Improved
 
 ### Fixed
+
+## 0.4.2 — 2026-11-15
+
+### Fixed
 - A transcription no longer fails at the very end with "Whisper produced no transcript". A single letter Whisper wrote badly used to throw away the whole transcript; now only that letter is lost.
 
 ## 0.4.1 — 2026-11-05
