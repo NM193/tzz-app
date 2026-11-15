@@ -532,7 +532,7 @@ pub async fn whisper_srt(
     cancel::check()?;
 
     let srt_path = whisper_srt_path(&out_base);
-    let srt = std::fs::read_to_string(&srt_path).map_err(|_| {
+    let srt = read_srt(&srt_path).map_err(|_| {
         let tail: Vec<&str> = log.iter().rev().take(4).map(String::as_str).collect();
         format!("Whisper produced no transcript. {}", tail.join(" "))
     })?;
@@ -564,6 +564,20 @@ fn whisper_srt_path(out_base: &Path) -> PathBuf {
     let mut name = out_base.as_os_str().to_owned();
     name.push(".srt");
     PathBuf::from(name)
+}
+
+/// Read Whisper's SRT, putting up with bytes that are not text.
+///
+/// WHY not `read_to_string`: whisper-cli writes each segment's bytes as the
+/// model produced them, and only its JSON output mends a letter split between
+/// two tokens. So a two-byte letter can end one cue and finish the next, and a
+/// retry at high temperature can emit a byte that belongs to nothing. One such
+/// byte made `read_to_string` refuse the whole file, and an hour of finished
+/// transcription was reported as "Whisper produced no transcript". Now it
+/// costs that letter, shown as "�".
+fn read_srt(path: &Path) -> std::io::Result<String> {
+    let bytes = std::fs::read(path)?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
 /// `whisper_print_progress_callback: progress =  35%` -> `35.0`
@@ -872,6 +886,29 @@ mod tests {
             whisper_srt_path(base),
             PathBuf::from("/tmp/yt-mp3-whisper/1. Kako Napraviti Dobru Reklamu Uvod.srt")
         );
+    }
+
+    #[test]
+    fn a_broken_letter_costs_that_letter_not_the_transcript() {
+        let dir = std::env::temp_dir().join("yt-mp3-test-broken-letter");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("talk.srt");
+        // "č" is two bytes, C4 8D, and here they landed in two cues.
+        std::fs::write(
+            &path,
+            b"1\n00:00:00,000 --> 00:00:02,000\n Dobar dan, \xc4\n\n\
+              2\n00:00:02,000 --> 00:00:04,000\n\x8dekajte malo.\n\n",
+        )
+        .unwrap();
+
+        let srt = read_srt(&path);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        let cues = parse_srt(&srt.expect("the rest of the file is still readable"));
+        assert_eq!(cues.len(), 2, "{cues:?}");
+        assert!(cues[0].text.starts_with("Dobar dan,"), "{cues:?}");
+        assert!(cues[1].text.ends_with("ekajte malo."), "{cues:?}");
     }
 
     #[test]

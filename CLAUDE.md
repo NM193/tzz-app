@@ -102,6 +102,11 @@ These were bugs. The comments in the code say the same; this is the index.
   after the pause. `parse_srt` folds the repeats into one cue, so the document
   shows only a hole: two minutes of silence cost Small everything after them.
   `-mc 0` stops it. A line or two invented inside the pause itself remains.
+- **Whisper's SRT is not always text.** whisper-cli writes each segment's
+  bytes as the model produced them; only its JSON output mends a letter split
+  between tokens. One such byte made `read_to_string` refuse the file, and a
+  finished hour was reported as "Whisper produced no transcript". The SRT is
+  read as bytes and decoded leniently: a bad byte costs one letter.
 - **Screens belong to exactly one paragraph.** Paragraphs break at chapter
   boundaries as well as minutes, so a fixed 60-second window double-counts.
 - **A killed app used to orphan ffmpeg.** Now ffmpeg reads from pipes that
@@ -286,7 +291,7 @@ Not built: Windows support.
 - `npm run install:app` -- build and replace the copy in /Applications
 - `npm run build:vite` -- typecheck the frontend only
 - `bash scripts/fetch-tools.sh` -- put the external tools inside the app
-- `cd src-tauri && cargo test` -- 143 tests, all pure logic
+- `cd src-tauri && cargo test` -- 144 tests, all pure logic
 - `python3 scripts/test_changelog.py` -- the release notes reader
 - `node --test src/lib/releaseNotes.test.ts` -- what the update notice shows
 - `node --test src/lib/naming.test.ts` -- what the names dialog asks and refuses
